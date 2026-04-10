@@ -114,15 +114,6 @@ libchilli_la_SOURCES += cmdsock.c
 chilliinclude_HEADERS += cmdsock.h
 endif
 
-if WITH_CHILLIPROXY
-sbin_PROGRAMS += chilli_proxy
-chilli_proxy_SOURCES = main-proxy.c 
-chilli_proxy_LDADD = ${LDADD}
-if WITH_CURL
-chilli_proxy_LDADD += ${LIBCURL} 
-endif
-endif
-
 if WITH_CHILLIRADSEC
 sbin_PROGRAMS += chilli_radsec
 chilli_radsec_SOURCES = main-radsec.c 

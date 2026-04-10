@@ -20,7 +20,7 @@ jobs:
     - name: Configure
       run: |
         ./configure --enable-largelimits --enable-proxyvsa --enable-miniportal \
-        --enable-chilliredir --enable-chilliproxy --enable-binstatusfile \
+        --enable-chilliredir --enable-binstatusfile \
         --enable-chilliscript --enable-chilliradsec --with-avl \
         --enable-eapol --enable-modules \
         --enable-multiroute --enable-extadmvsa --with-openssl --with-poll \

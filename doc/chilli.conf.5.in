@@ -590,14 +590,6 @@ URL of homepage to redirect unauthenticated users to. If not specified this defa
 .B uamserver.
 
 .TP
-.BI uamaaaurl " url"
-When chilli is built with the 
-.I --enable-chilliproxy
-compile-time option, this configuration option can be used to define 
-a URL to use for the HTTP AAA protocol described here:
-http://www.coova.org/CoovaChilli/Proxy
-
-.TP
 .BI uamsecret " secret"
 Shared secret between uamserver and chilli. This secret should be set
 in order not to compromise security.

@@ -60,9 +60,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_CHILLIQUERY
     "ENABLE_CHILLIQUERY "
 #endif
-#ifdef ENABLE_CHILLIPROXY
-    "ENABLE_CHILLIPROXY "
-#endif
 #ifdef ENABLE_COA
     "ENABLE_COA "
 #endif

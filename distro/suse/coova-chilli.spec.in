@@ -32,7 +32,6 @@ your favorite radius server. Read more at http://coova.github.io/.
 	--enable-largelimits \
 	--enable-miniportal \
 	--enable-chilliredir \
-	--enable-chilliproxy \
         --enable-chilliscript \
 	--with-poll \
 %if %{!?_without_ssl:1}0

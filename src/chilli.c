@@ -64,10 +64,6 @@ static int acct_req(acct_type type,
 
 static pid_t chilli_pid = 0;
 
-#ifdef ENABLE_CHILLIPROXY
-static pid_t proxy_pid = 0;
-#endif
-
 #ifdef ENABLE_CHILLIRADSEC
 static pid_t radsec_pid = 0;
 #endif
@@ -140,7 +136,7 @@ int child_remove_pid(pid_t pid) {
   return -1;
 }
 
-#if defined(ENABLE_CHILLIREDIR) || defined(ENABLE_CHILLIPROXY) || defined(ENABLE_CHILLIRADSEC)
+#if defined(ENABLE_CHILLIREDIR) || defined(ENABLE_CHILLIRADSEC)
 static pid_t launch_daemon(char *name, char *path) {
   pid_t cpid = getpid();
   pid_t p = chilli_fork(CHILLI_PROC_DAEMON, name);
@@ -174,12 +170,6 @@ static pid_t launch_daemon(char *name, char *path) {
   }
 
   return 0;
-}
-#endif
-
-#ifdef ENABLE_CHILLIPROXY
-static void launch_chilliproxy(void) {
-  proxy_pid = launch_daemon("[chilli_proxy]", SBINDIR "/chilli_proxy");
 }
 #endif
 
@@ -317,12 +307,6 @@ static void _sigchld(int signum) {
       launch_chilliradsec();
     }
 #endif
-#ifdef ENABLE_CHILLIPROXY
-    if (proxy_pid > 0 && proxy_pid == pid) {
-      syslog(LOG_ERR, "Having to re-launch chilli_proxy... PID %d exited", pid);
-      launch_chilliproxy();
-    }
-#endif
 #ifdef ENABLE_CHILLIREDIR
     if (redir_pid > 0 && redir_pid == pid) {
       syslog(LOG_ERR, "Having to re-launch chilli_redir... PID %d exited", pid);
@@ -355,11 +339,6 @@ static void _sigusr1(int signum) {
 #ifdef ENABLE_CHILLIREDIR
   if (redir_pid)
     kill(redir_pid, SIGUSR1);
-#endif
-
-#ifdef ENABLE_CHILLIPROXY
-  if (proxy_pid)
-    kill(proxy_pid, SIGUSR1);
 #endif
 
 #ifdef ENABLE_CHILLIRADSEC
@@ -6275,11 +6254,9 @@ int chilli_main(int argc, char **argv) {
       _options.radsec = 0;
 #endif
     } else if (_options.uamaaaurl) {
-#ifdef ENABLE_CHILLIPROXY
-      launch_chilliproxy();
-#else
-      syslog(LOG_ERR, "Feature is not supported; use --enable-chilliproxy");
-#endif
+      syslog(LOG_ERR, "HTTP AAA (uamaaaurl / chilli_proxy) is no longer supported");
+      free(_options.uamaaaurl);
+      _options.uamaaaurl = NULL;
     }
 
     if (_options.redir) {
@@ -6565,11 +6542,6 @@ int chilli_main(int argc, char **argv) {
 #ifdef ENABLE_CHILLIREDIR
     if (redir_pid > 0) {
       kill(redir_pid, SIGTERM);
-    }
-#endif
-#ifdef ENABLE_CHILLIPROXY
-    if (proxy_pid > 0) {
-      kill(proxy_pid, SIGTERM);
     }
 #endif
 #ifdef ENABLE_CHILLIRADSEC

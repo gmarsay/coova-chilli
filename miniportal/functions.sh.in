@@ -21,7 +21,6 @@ HS_ENABLED=true
 
 CHILLI_RESPONSE=@SBINDIR@/chilli_response
 CHILLI_QUERY=@SBINDIR@/chilli_query
-CHILLI_PROXY=@SBINDIR@/chilli_proxy
 
 # default, after configuration
 
@@ -38,8 +37,7 @@ register_with_pkg() {
     type=$1; shift
     user=$1; shift
     pass=$1; shift
-    regout=$(pkg_attr_file $* default|$CHILLI_PROXY --register status new_$type user "$user" pass "$pass")
-    echo $regout
+    [ -n "$USERS" ] && echo "$user:$pass:::" >> $USERS
 }
 
 #config miniportal

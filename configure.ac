@@ -504,15 +504,6 @@ if test x"$enable_statfile" = xyes || test x"$enable_binstatfile" = xyes; then
    AC_DEFINE(ENABLE_STATFILE,1,[Define to enable status file])
 fi
 
-AC_ARG_ENABLE(chilliproxy, [AS_HELP_STRING([--enable-chilliproxy],[Enable support for HTTP AAA Proxy])], 
-  enable_chilliproxy=$enableval, enable_chilliproxy=no)
-
-if test x"$enable_chilliproxy" = xyes; then
-   AC_DEFINE(ENABLE_CHILLIPROXY,1,[Define to enable HTTP AAA Proxy])
-fi
-
-AM_CONDITIONAL(WITH_CHILLIPROXY, [test x"$enable_chilliproxy" = xyes])
-
 AC_ARG_ENABLE(multiroute, [AS_HELP_STRING([--enable-multiroute],[Enable support for multiple routes])], 
   enable_multiroute=$enableval, enable_multiroute=no)
 

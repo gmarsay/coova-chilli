@@ -33,14 +33,8 @@ if [ "$HS_REG_MODE" = "self" ]; then
 	    errmsg="For security reasons, we only allow you to enter very basic text. \
                     Remove any punctuation or non-ASCII characters."
 
-	if [ "$HS_UAMAAAURL" = "" ]; then
-	    [ -z "$errmsg" ] && grep "^$FORM_username:" $USERS >/dev/null 2>&1 && \
-		errmsg="Username already taken, select another one."
-	else
-	    regout=$(echo|$CHILLI_PROXY --register status check user "$FORM_username")
-	    [ -z "$errmsg" ] && [ "$regout" != "available" ] && \
-		errmsg="Username already taken, select another one.[$regout]"
-	fi
+	[ -z "$errmsg" ] && grep "^$FORM_username:" $USERS >/dev/null 2>&1 && \
+	    errmsg="Username already taken, select another one."
 
 	
 	[ -z "$errmsg" -a "$FORM_password" != "$FORM_password2" ] && \
@@ -58,11 +52,7 @@ if [ "$HS_REG_MODE" = "self" ]; then
 
 	[ -z "$errmsg" -a "$register" = "1" ] && {
 
-	    if [ "$HS_UAMAAAURL" = "" ]; then
-		echo "$FORM_username:$FORM_password:$FORM_realname:$FORM_email" >> $USERS
-	    else
-		regout=$(echo|$CHILLI_PROXY --register status new_user user "$FORM_username" pass "$FORM_password")
-	    fi
+	    echo "$FORM_username:$FORM_password:$FORM_realname:$FORM_email" >> $USERS
 
 	    sync
 

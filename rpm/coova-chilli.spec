@@ -31,7 +31,6 @@ sh bootstrap
 	--enable-largelimits \
 	--enable-miniportal \
 	--enable-chilliredir \
-	--enable-chilliproxy \
         --enable-chilliscript \
 	--with-poll \
     --enable-libjson \

@@ -149,7 +149,7 @@ option "uamhostname"  - "Special simple hostname (no dots) to be resolved to uam
 option "authedallowed" - "Resources exempt from session limitations" string no multiple
 option "uamauthedallowed" - "Use uamallowed as resources exempt from session limitations" flag off
 
-option "uamaaaurl"    - "UAM AAA URL specifying the URL to use for the Chilli HTTP AAA" string no
+option "uamaaaurl"    - "Legacy option; ignored (HTTP AAA chilli_proxy removed)" string no
 option "domaindnslocal" - "Option to consider all hostnames in domain as local" flag   off
 option "radsec" - "Use RadSec tunning (requires SSL; not compatible with uamaaaurl)" flag   off
 

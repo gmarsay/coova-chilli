@@ -21,7 +21,7 @@ config.status: configure
 	--prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info \
 	--sysconfdir=/etc --localstatedir=/var --enable-largelimits \
 	--enable-proxyvsa --enable-miniportal --enable-chilliredir \
-	--enable-chilliproxy --enable-binstatusfile --enable-chilliscript \
+	--enable-binstatusfile --enable-chilliscript \
 	--enable-chilliradsec --enable-eapol \
 	--enable-modules \
 	--enable-multiroute --enable-extadmvsa --with-openssl --with-poll \
