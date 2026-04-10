@@ -93,9 +93,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_EAPOL
     "ENABLE_EAPOL "
 #endif
-#ifdef ENABLE_EWTAPI
-    "ENABLE_EWTAPI "
-#endif
 #ifdef ENABLE_FORCEDNS
     "ENABLE_FORCEDNS "
 #endif

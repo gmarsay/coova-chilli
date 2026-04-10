@@ -48,9 +48,6 @@
 #define REDIR_CAPTIVE_PORTAL_IDENTIFICATION   11
 
 #define REDIR_WWW            20
-#ifdef ENABLE_EWTAPI
-#define REDIR_EWTAPI         21
-#endif
 #ifdef ENABLE_WPAD
 #define REDIR_WPAD           22
 #endif

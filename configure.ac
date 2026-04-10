@@ -666,18 +666,10 @@ fi
 
 AM_CONDITIONAL(WITH_MINICONFIG, [test x"$enable_miniconfig" = xyes])
 
-AC_ARG_ENABLE(ewtapi, [AS_HELP_STRING([--enable-ewtapi],[Enable support for CoovaEWT API])], 
-  enable_ewtapi=$enableval, enable_ewtapi=no)
-
-if test x"$enable_ewtapi" = xyes; then
-   AC_DEFINE(ENABLE_EWTAPI,1,[Define to enable CoovaEWT API])
-fi
-
 AC_ARG_ENABLE(libjson, [AS_HELP_STRING([--enable-libjson],[Enable support for libjson])], 
   enable_libjson=$enableval, enable_libjson=no)
 
-AM_CONDITIONAL(WITH_EWTAPI, [test x"$enable_ewtapi" = xyes])
-AM_CONDITIONAL(WITH_JSONLIB, [test x"$enable_ewtapi" = xyes || test x"$enable_libjson" = xyes])
+AM_CONDITIONAL(WITH_JSONLIB, [test x"$enable_libjson" = xyes])
 
 AC_ARG_ENABLE(ssdp, [AS_HELP_STRING([--enable-ssdp],[Enable support for Simple Service Discovery Protocol])], 
   enable_ssdp=$enableval, enable_ssdp=no)

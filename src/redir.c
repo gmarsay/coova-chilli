@@ -23,9 +23,6 @@
 #ifdef ENABLE_MODULES
 #include "chilli_module.h"
 #endif
-#ifdef ENABLE_EWTAPI
-#include "ewt.h"
-#endif
 #include "json/json.h"
 
 static int optionsdebug = 0; /* TODO: Should be changed to instance */
@@ -1470,10 +1467,6 @@ static int redir_getreq(struct redir_t *redir, struct redir_socket_t *sock,
         { conn->type = REDIR_MACREAUTH; return 0; }
 	else if (!strcmp(path, "abort"))
         { conn->type = REDIR_ABORT; return 0; }
-#ifdef ENABLE_EWTAPI
-	else if (!strncmp(path, "ewt/json", 8))
-	  conn->type = REDIR_EWTAPI;
-#endif
 #ifdef ENABLE_WPAD
 	else if (!strncmp(path, "wpad.dat", 8))
 	  conn->type = REDIR_WPAD;
@@ -1584,17 +1577,6 @@ static int redir_getreq(struct redir_t *redir, struct redir_socket_t *sock,
   switch(conn->type) {
     case REDIR_STATUS:
       return 0;
-
-#ifdef ENABLE_EWTAPI
-    case REDIR_EWTAPI:
-#ifdef HAVE_SSL
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): EWT API pre-process", __FUNCTION__, __LINE__);
-      if (sock->sslcon) {
-      }
-#endif
-      return 0;
-#endif
 
     case REDIR_LOGIN:
       {
@@ -2651,23 +2633,7 @@ int redir_main(struct redir_t *redir,
     if (_options.debug)
       syslog(LOG_DEBUG, "%s(%d): getstate() session not found", __FUNCTION__, __LINE__);
 #endif
-
-#ifdef ENABLE_EWTAPI
-    if (_options.uamuissl && isui) {
-      /*
-       *  Allow external (WAN) access to EWT API if available,
-       *  always under SSL.
-       */
-#if(_debug_ > 1)
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): redir connection is SSL", __FUNCTION__, __LINE__);
-#endif
-      conn.flags |= USING_SSL;
-    } else
-#endif
-    {
-      return redir_main_exit(&socket, forked, rreq);
-    }
+    return redir_main_exit(&socket, forked, rreq);
   }
 
   splash = (conn.s_params.flags & REQUIRE_UAM_SPLASH) == REQUIRE_UAM_SPLASH;
@@ -2756,14 +2722,8 @@ int redir_main(struct redir_t *redir,
 #ifdef ENABLE_WPAD
     case REDIR_WPAD:
 #endif
-#ifdef ENABLE_EWTAPI
-    case REDIR_EWTAPI:
-#endif
     case REDIR_WWW:
       {
-#ifdef ENABLE_EWTAPI
-        char isEWT = conn.type == REDIR_EWTAPI;
-#endif
 #ifdef ENABLE_WPAD
         char isWPAD = conn.type == REDIR_WPAD;
 #endif
@@ -2771,9 +2731,6 @@ int redir_main(struct redir_t *redir,
         int fd = -1;
 
         if (_options.wwwdir && (*conn.wwwfile
-#ifdef ENABLE_EWTAPI
-                                || isEWT
-#endif
 #ifdef ENABLE_WPAD
                                 || isWPAD
 #endif
@@ -2784,14 +2741,6 @@ int redir_main(struct redir_t *redir,
           int parse = 0;
 
           /* check filename */
-#ifdef ENABLE_EWTAPI
-          if (isEWT) {
-            if (!(conn.s_params.flags & ADMIN_LOGIN)) {
-              syslog(LOG_WARNING, "Permission denied to EWT API");
-              return redir_main_exit(&socket, forked, rreq);
-            }
-          } else
-#endif
 #ifdef ENABLE_WPAD
             if (isWPAD) {
               filename = "wpad.dat";
@@ -2819,10 +2768,6 @@ int redir_main(struct redir_t *redir,
             }
 
           /* serve the local content */
-
-#ifdef ENABLE_EWTAPI
-          if (isEWT) { ctype = "application/json"; parse = 1; } else
-#endif
 
             if      (!strcmp(filename + (namelen - 5), ".html")) ctype = "text/html";
             else if (!strcmp(filename + (namelen - 4), ".gif"))  ctype = "image/gif";
@@ -3014,13 +2959,6 @@ int redir_main(struct redir_t *redir,
             setenv("CHI_CHALLENGE", buffer, 1);
 
             switch (conn.type) {
-#ifdef ENABLE_EWTAPI
-              case REDIR_EWTAPI:
-                {
-                  ewtapi(redir, &socket, &conn, &httpreq);
-                }
-                break;
-#endif
 #ifdef ENABLE_WPAD
               case REDIR_WPAD:
                 if (isWPAD && _options.wpadpacfile) {
