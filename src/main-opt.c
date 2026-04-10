@@ -51,9 +51,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_APSESSIONID
     "ENABLE_APSESSIONID "
 #endif
-#ifdef ENABLE_ACCEPTLANGUAGE
-    "ENABLE_ACCEPTLANGUAGE "
-#endif
 #ifdef ENABLE_AUTHEDALLOWED
     "ENABLE_AUTHEDALLOWED "
 #endif
@@ -188,9 +185,6 @@ static const char *compile_options = "Compiled with "
 #endif
 #ifdef ENABLE_UAMUIPORT
     "ENABLE_UAMUIPORT "
-#endif
-#ifdef ENABLE_USERAGENT
-    "ENABLE_USERAGENT "
 #endif
 #ifdef ENABLE_WPAD
     "ENABLE_WPAD "

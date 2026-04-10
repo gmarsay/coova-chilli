@@ -39,8 +39,6 @@
 #define RADIUS_ATTR_COOVACHILLI_SESSION_STATE             15 /* integer */
 #define RADIUS_ATTR_COOVACHILLI_SESSION_ID                16 /* string */
 #define RADIUS_ATTR_COOVACHILLI_AP_SESSION_ID             17 /* string */
-#define RADIUS_ATTR_COOVACHILLI_USER_AGENT                18 /* string */
-#define RADIUS_ATTR_COOVACHILLI_ACCEPT_LANGUAGE           19 /* string */
 
 #define	RADIUS_ATTR_COOVACHILLI_MAX_INPUT_GIGAWORDS       21 /* integer */
 #define	RADIUS_ATTR_COOVACHILLI_MAX_OUTPUT_GIGAWORDS      22 /* integer */

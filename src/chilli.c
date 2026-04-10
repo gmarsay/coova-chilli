@@ -1273,24 +1273,6 @@ int chilli_req_attrs(struct radius_t *radius,
                          RADIUS_ATTR_COOVACHILLI_ORIGINALURL,
                          0, (uint8_t *) state->redir.userurl,
                          strlen(state->redir.userurl));
-
-#ifdef ENABLE_USERAGENT
-        if (state->redir.useragent[0])
-          radius_addattr(radius, pack, RADIUS_ATTR_VENDOR_SPECIFIC,
-                         RADIUS_VENDOR_COOVACHILLI,
-                         RADIUS_ATTR_COOVACHILLI_USER_AGENT,
-                         0, (uint8_t *) state->redir.useragent,
-                         strlen(state->redir.useragent));
-#endif
-
-#ifdef ENABLE_ACCEPTLANGUAGE
-        if (state->redir.acceptlanguage[0])
-          radius_addattr(radius, pack, RADIUS_ATTR_VENDOR_SPECIFIC,
-                         RADIUS_VENDOR_COOVACHILLI,
-                         RADIUS_ATTR_COOVACHILLI_ACCEPT_LANGUAGE,
-                         0, (uint8_t *) state->redir.acceptlanguage,
-                         strlen(state->redir.acceptlanguage));
-#endif
       }
 
       break;

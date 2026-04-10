@@ -91,14 +91,6 @@ struct redir_state {
   /*  EAP identity of the last request sent */
   uint8_t eap_identity;
 
-#ifdef ENABLE_USERAGENT
-  char useragent[REDIR_USERAGENTSIZE];
-#endif
-
-#ifdef ENABLE_ACCEPTLANGUAGE
-  char acceptlanguage[128];
-#endif
-
 #if defined(ENABLE_LOCATION) || defined(ENABLE_PROXYVSA)
   uint8_t called[RADIUS_ATTR_VLEN];
   uint8_t calledlen;

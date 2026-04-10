@@ -685,20 +685,6 @@ if test x"$enable_extadmvsa" = xyes; then
    AC_DEFINE(ENABLE_EXTADMVSA,1,[Define to enable admin-user VSA support])
 fi
 
-AC_ARG_ENABLE(useragent, [AS_HELP_STRING([--enable-useragent],[Enable recording user-agent])], 
-  enable_useragent=$enableval, enable_useragent=no)
-
-if test x"$enable_useragent" = xyes ; then
-   AC_DEFINE(ENABLE_USERAGENT,1,[Define enable the recording of user-agent])
-fi
-
-AC_ARG_ENABLE(acceptlanguage, [AS_HELP_STRING([--enable-acceptlanguage],[Enable recording Accept-Language])], 
-  enable_acceptlanguage=$enableval, enable_acceptlanguage=no)
-
-if test x"$enable_acceptlanguage" = xyes ; then
-   AC_DEFINE(ENABLE_ACCEPTLANGUAGE,1,[Define enable the recording of accept-language])
-fi
-
 AC_ARG_ENABLE(location, [AS_HELP_STRING([--enable-location],[Enable Location Awareness])], 
   enable_location=$enableval, enable_location=no)
 

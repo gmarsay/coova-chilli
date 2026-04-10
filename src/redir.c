@@ -1517,30 +1517,6 @@ static int redir_getreq(struct redir_t *redir, struct redir_socket_t *sock,
             syslog(LOG_DEBUG, "%s(%d): Content-Length: %s", __FUNCTION__, __LINE__, p);
 #endif
 	}
-#ifdef ENABLE_USERAGENT
-	else if (!strncasecmp(buffer,"User-Agent:",11)) {
-	  p = buffer + 11;
-	  while (*p && isspace((int) *p)) p++;
-	  strlcpy(conn->s_state.redir.useragent,
-                  p, sizeof(conn->s_state.redir.useragent));
-#if(_debug_)
-          if (_options.debug)
-            syslog(LOG_DEBUG, "%s(%d): User-Agent: %s", __FUNCTION__, __LINE__, conn->s_state.redir.useragent);
-#endif
-	}
-#endif
-#ifdef ENABLE_ACCEPTLANGUAGE
-	else if (!strncasecmp(buffer,"Accept-Language:",16)) {
-	  p = buffer + 16;
-	  while (*p && isspace((int) *p)) p++;
-	  strlcpy(conn->s_state.redir.acceptlanguage,
-                  p, sizeof(conn->s_state.redir.acceptlanguage));
-#if(_debug_ > 1)
-          if (_options.debug)
-            syslog(LOG_DEBUG, "%s(%d): Accept-Language: %s", __FUNCTION__, __LINE__, conn->s_state.redir.acceptlanguage);
-#endif
-	}
-#endif
 	else if (!strncasecmp(buffer,"Cookie:",7)) {
 	  p = buffer + 7;
 	  while (*p && isspace((int) *p)) p++;
