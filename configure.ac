@@ -639,15 +639,6 @@ fi
 
 AM_CONDITIONAL(WITH_NETBIOS, [test x"$enable_netbios" = xyes])
 
-AC_ARG_ENABLE(l2tpppp, [AS_HELP_STRING([--enable-l2tpppp],[Enable support for L2TP/PPP Tunneling])], 
-  enable_l2tpppp=$enableval, enable_l2tpppp=no)
-
-if test x"$enable_l2tpppp" = xyes; then
-   AC_DEFINE(ENABLE_L2TP_PPP,1,[Define to enable L2TP/PPP])
-fi
-
-AM_CONDITIONAL(WITH_L2TP_PPP, [test x"$enable_l2tpppp" = xyes])
-
 AC_ARG_ENABLE(eapol, [AS_HELP_STRING([--enable-eapol],[Enable support for EAPOL])], 
   enable_eapol=$enableval, enable_eapol=no)
 

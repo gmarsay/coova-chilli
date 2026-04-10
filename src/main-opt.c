@@ -117,9 +117,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_JSON
     "ENABLE_JSON "
 #endif
-#ifdef ENABLE_L2TP_PPP
-    "ENABLE_L2TP_PPP "
-#endif
 #ifdef ENABLE_LARGELIMITS
     "ENABLE_LARGELIMITS "
 #endif
