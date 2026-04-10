@@ -639,15 +639,6 @@ fi
 
 AM_CONDITIONAL(WITH_NETBIOS, [test x"$enable_netbios" = xyes])
 
-AC_ARG_ENABLE(pppoe, [AS_HELP_STRING([--enable-pppoe],[Enable support for PPPoE])], 
-  enable_pppoe=$enableval, enable_pppoe=no)
-
-if test x"$enable_pppoe" = xyes; then
-   AC_DEFINE(ENABLE_PPPOE,1,[Define to enable PPPoE])
-fi
-
-AM_CONDITIONAL(WITH_PPPOE, [test x"$enable_pppoe" = xyes])
-
 AC_ARG_ENABLE(l2tpppp, [AS_HELP_STRING([--enable-l2tpppp],[Enable support for L2TP/PPP Tunneling])], 
   enable_l2tpppp=$enableval, enable_l2tpppp=no)
 

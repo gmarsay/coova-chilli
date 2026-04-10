@@ -153,9 +153,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_NETNAT
     "ENABLE_NETNAT "
 #endif
-#ifdef ENABLE_PPPOE
-    "ENABLE_PPPOE "
-#endif
 #ifdef ENABLE_PROXYVSA
     "ENABLE_PROXYVSA "
 #endif

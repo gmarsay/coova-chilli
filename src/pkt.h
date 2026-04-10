@@ -36,8 +36,6 @@
 #define PKT_ETH_PROTO_IPX    0x8137
 #define PKT_ETH_PROTO_IPv6   0x86dd
 #define PKT_ETH_PROTO_PPP    0x880b
-#define PKT_ETH_PROTO_PPPOED 0x8863
-#define PKT_ETH_PROTO_PPPOES 0x8864
 #define PKT_ETH_PROTO_EAPOL  0x888e
 
 #define PKT_IP_PLEN            1500 /* IP Payload Length */
@@ -93,55 +91,6 @@ struct pkt_ethhdr8021q_t {
   uint16_t pcp_cfi_vid;
   uint16_t prot;
 } __attribute__((packed));
-
-#ifdef ENABLE_PPPOE
-struct pkt_pppoe_hdr_t {
-#define PKT_PPPoE_VERSION 0x11
-  uint8_t version_type;
-#define PKT_PPPoE_PADI 0x09
-#define PKT_PPPoE_PADO 0x07
-#define PKT_PPPoE_PADR 0x19
-#define PKT_PPPoE_PADS 0x65
-#define PKT_PPPoE_PADT 0xa7
-  uint8_t code;
-  uint16_t session_id;
-  uint16_t length;
-} __attribute__((packed));
-
-struct pkt_pppoe_taghdr_t {
-#define PPPoE_TAG_ServiceName        0x0101
-#define PPPoE_TAG_ACName             0x0102
-#define PPPoE_TAG_HostUniq           0x0103
-#define PPPoE_TAG_ACCookie           0x0104
-#define PPPoE_TAG_VendorSpecific     0x0105
-#define PPPoE_TAG_ServiceNameError   0x0201
-#define PPPoE_TAG_ACSystemError      0x0202
-  uint16_t type;
-  uint16_t length;
-} __attribute__((packed));
-
-#define PKT_PPP_PROTO_LCP 0xc021
-
-struct pkt_ppp_lcp_t {
-#define PPP_LCP_ConfigRequest 0x01
-#define PPP_LCP_ConfigAck 0x02
-#define PPP_LCP_ConfigNak 0x03
-#define PPP_LCP_ConfigReject 0x04
-  uint8_t code;
-  uint8_t id;
-  uint16_t length;
-} __attribute__((packed));
-
-struct pkt_lcp_opthdr_t {
-#define PPP_LCP_OptMTU 0x01
-#define PPP_LCP_OptACCM 0x02
-#define PPP_LCP_OptAuthProto 0x03
-#define PPP_LCP_OptMagic 0x05
-#define PPP_LCP_OptCompress 0x07
-  uint8_t type;
-  uint8_t length;
-} __attribute__((packed));
-#endif
 
 struct pkt_iphdr_t {
   uint8_t  version_ihl;
