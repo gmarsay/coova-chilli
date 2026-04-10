@@ -32,11 +32,6 @@ debian/Makefile
 debian/Makefile.in
 doc/Makefile
 doc/Makefile.in
-json/Makefile
-json/Makefile.in
-json/json_config.h
-json/json_config.h.in
-json/stamp-h2
 src/Makefile
 src/Makefile.in
 src/mssl/Makefile

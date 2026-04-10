@@ -20,7 +20,7 @@
 
 #include "system.h"
 #include "chilli.h"
-#include "json/json.h"
+#include <json.h>
 
 static int optionsdebug = 0; /* TODO: Should be changed to instance */
 

@@ -39,14 +39,13 @@ chilli_response_SOURCES = main-response.c
 chilli_query_SOURCES = main-query.c 
 chilli_opt_SOURCES = main-opt.c cmdline.c
 
-libchilli_la_LIBADD = $(BSTRING_LIBS) $(STRLCPY_LIBS) $(top_builddir)/json/libjson.la
+libchilli_la_LIBADD = $(BSTRING_LIBS) $(STRLCPY_LIBS) $(JSON_LIBS)
 
 if WITH_OPENSSL
 libchilli_la_LIBADD += ${LIBSSL}
 endif
 
-LDADD = libchilli.la ${LIBRT} $(BSTRING_LIBS) $(STRLCPY_LIBS) ${LIBJSON} \
-	$(top_builddir)/json/libjson.la
+LDADD = libchilli.la ${LIBRT} $(BSTRING_LIBS) $(STRLCPY_LIBS) $(JSON_LIBS)
 
 if WITH_OPENSSL
 LDADD += ${LIBSSL}
@@ -54,7 +53,7 @@ endif
 
 AM_CFLAGS = -D_GNU_SOURCE -Wall -fno-builtin -fno-strict-aliasing \
   -fomit-frame-pointer -funroll-loops -pipe \
- -I$(top_builddir)/json \
+ $(JSON_CFLAGS) \
  -DDEFCHILLICONF='"$(sysconfdir)/chilli.conf"'\
  -DDEFPIDFILE='"$(localstatedir)/run/chilli.pid"'\
  -DDEFSTATEDIR='"$(localstatedir)/run"'\

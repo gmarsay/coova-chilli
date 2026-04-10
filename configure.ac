@@ -104,8 +104,6 @@ AC_CHECK_HEADERS([resolv.h net/route.h net/if.h net/if_arp.h net/if_tun.h net/et
 #endif
 ])
 
-AC_CHECK_HEADER(inttypes.h,[AC_DEFINE([JSON_C_HAVE_INTTYPES_H],[1],[Public define for json_inttypes.h])])
-AC_CONFIG_HEADER(json/json_config.h)
 AC_CHECK_DECLS([INFINITY], [], [], [[#include <math.h>]])
 AC_CHECK_DECLS([nan], [], [], [[#include <math.h>]])
 AC_CHECK_DECLS([isnan], [], [], [[#include <math.h>]])
@@ -161,7 +159,7 @@ AS_IF([$PKG_CONFIG --exists bstring], [
 AC_SUBST([BSTRING_CFLAGS])
 AC_SUBST([BSTRING_LIBS])
 
-dnl === Feature set (fixed): former stock defaults + always-on largelimits & JSON + bundled json/ ===
+dnl === Feature set (fixed): former stock defaults + always-on largelimits & JSON (system json-c) ===
 AC_DEFINE([ENABLE_CHILLIQUERY], [1], [Define to enable chilli_query])
 AM_CONDITIONAL([WITH_CHILLIQUERY], [test yes = yes])
 
@@ -178,12 +176,17 @@ AC_DEFINE([HAVE_SFHASH], [1], [Define to use SuperFastHash])
 AM_CONDITIONAL([WITH_SFHASH], [test yes = yes])
 
 AC_DEFINE([ENABLE_JSON], [1], [Define to enable Chilli JSON])
-AC_CHECK_LIB([json-c], [json_object_new_object],
-  [AC_SUBST([LIBJSON], ["-ljson-c"])],
-  [AC_CHECK_LIB([json], [json_object_new_object],
-    [AC_SUBST([LIBJSON], ["-ljson"])],
-    [AC_MSG_ERROR([libjson-c or libjson is required for JSON support])])])
-AM_CONDITIONAL([WITH_JSONLIB], [test yes = yes])
+AC_MSG_CHECKING([for libjson-c via pkg-config])
+AS_IF([$PKG_CONFIG --exists json-c], [
+  AC_MSG_RESULT([yes])
+  JSON_CFLAGS=`$PKG_CONFIG --cflags json-c`
+  JSON_LIBS=`$PKG_CONFIG --libs json-c`
+], [
+  AC_MSG_RESULT([no])
+  AC_MSG_ERROR([pkg-config module json-c not found; install libjson-c-dev (Debian/Ubuntu) or json-c.pc on PKG_CONFIG_PATH])
+])
+AC_SUBST([JSON_CFLAGS])
+AC_SUBST([JSON_LIBS])
 
 dnl OpenSSL (optional; default on)
 AC_ARG_WITH([openssl],
@@ -228,7 +231,6 @@ AC_SUBST(sysconfdir)
 AC_CONFIG_FILES([Makefile
 		 conf/Makefile
 		 doc/Makefile
-		 json/Makefile
 		 src/Makefile
 		 www/Makefile])
 
