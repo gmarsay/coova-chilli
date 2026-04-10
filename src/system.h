@@ -298,11 +298,6 @@ void copy_mac6(uint8_t *, uint8_t *);
 #define HAVE_SEARCH 1
 #endif
 
-#ifdef HAVE_AVL
-#include "avl/avl.h"
-#define HAVE_SEARCH 1
-#endif
-
 #if defined(USING_PCAP)
 #undef USING_MMAP
 #endif
