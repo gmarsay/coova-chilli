@@ -100,9 +100,7 @@ struct options_t {
   uint16_t radiusauthport;       /* Authentication UDP port */
   uint16_t radiusacctport;       /* Accounting UDP port */
   char* radiusnasid;             /* Radius NAS-Identifier */
-  char* radiuslocationid;        /* WISPr location ID */
-  char* radiuslocationname;      /* WISPr location name */
-  char* locationname;            /* Location name */
+  char* locationname;            /* Location name (portal / JSON) */
   int radiusnasporttype;         /* NAS-Port-Type */
   uint16_t coaport;              /* UDP port to listen to */
   int coanoipcheck;              /* Allow disconnect from any IP */
@@ -161,7 +159,6 @@ struct options_t {
   char* uamurl;                  /* URL of authentication server */
   char* uamaaaurl;               /* URL to use for HTTP based AAA */
   char* uamhomepage;             /* URL of redirection homepage */
-  char* wisprlogin;              /* Specific WISPr login url */
   char* usestatusfile;           /* Specific status file to use */
 
   struct in_addr uamlisten;      /* IP address of local authentication */
@@ -195,7 +192,6 @@ struct options_t {
   uint8_t noarpentries:1;
   uint8_t eapolenable:1;            /* Use eapol */
   uint8_t swapoctets:1;
-  uint8_t chillixml:1;
   uint8_t pap_always_ok:1;          /* Obsolete */
   uint8_t mschapv2:1;               /* Use and support MSCHAPv2 */
   uint8_t uamanydns:1;              /* Allow any dns server */
@@ -204,8 +200,6 @@ struct options_t {
   uint8_t uamnatanyip:1;            /* Provide NAT for Any IP clients */
 #endif
   uint8_t dnsparanoia:1;            /* Filter DNS for questionable content (dns tunnels) */
-  uint8_t no_wispr1:1;              /* Do not offer WISPr 1.0 XML */
-  uint8_t no_wispr2:1;              /* Do not offer WISPr 2.0 XML */
   uint8_t acct_update:1;            /* Allow for session parameter updates in accounting response */
   uint8_t wpaguests:1;              /* Allow WPS "Guest" access */
   uint8_t openidauth:1;             /* Allow OpenID authentication */

@@ -286,16 +286,10 @@ The
 option.
 
 .TP
-.BI WISPR_LOCATION_ID= <location-id>
+.BI LOCATION_NAME= <location-name>
 The 
-.B radiuslocationid
-option.
-
-.TP
-.BI WISPR_LOCATION_NAME= <location-name>
-The 
-.B radiuslocationname
-option.
+.B locationname
+option, when set.
 
 .TP
 .BI USER_NAME= <username>
@@ -326,12 +320,12 @@ The max session time, as set by RADIUS Session-Timeout.
 The max idle time, as set by RADIUS Idle-Timeout.
 
 .TP
-.BI WISPR_BANDWIDTH_MAX_UP= <bandwidth>
-Max up stream bandwidth set by RADIUS WISPr-Bandwidth-Max-Up.
+.BI BANDWIDTH_MAX_UP= <bandwidth>
+Max upstream bandwidth (bps) from RADIUS CoovaChilli-Bandwidth-Max-Up.
 
 .TP
-.BI WISPR_BANDWIDTH_MAX_DOWN= <bandwidth>
-Max down stream bandwidth set by RADIUS WISPr-Bandwidth-Max-Down.
+.BI BANDWIDTH_MAX_DOWN= <bandwidth>
+Max downstream bandwidth (bps) from RADIUS CoovaChilli-Bandwidth-Max-Down.
 
 .TP
 .BI COOVACHILLI_MAX_INPUT_OCTETS= <bytes>
@@ -408,18 +402,8 @@ secret should be changed in order not to compromise security.
 Network access server identifier (default nas01).
 
 .TP
-.BI radiuslocationid " id"
-WISPr Location ID. Should be in the format: isocc=<ISO_Country_Code>,
-cc=<E.164_Country_Code>, ac=<E.164_Area_Code>, network=<ssid/ZONE>. This
-parameter is further described in the document: Wi-Fi Alliance -
-Wireless ISP Roaming - Best Current Practices v1, Feb 2003.
-
-.TP
-.BI radiuslocationname " name"
-WISPr Location Name. Should be in the format:
-<HOTSPOT_OPERATOR_NAME>,<LOCATION>. This parameter is further
-described in the document: Wi-Fi Alliance - Wireless ISP Roaming -
-Best Current Practices v1, Feb 2003.
+.BI locationname " name"
+Human-readable location label for captive portal and JSON API responses.
 
 .TP
 .BI radiusnasporttype " type"
@@ -614,12 +598,6 @@ a URL to use for the HTTP AAA protocol described here:
 http://www.coova.org/CoovaChilli/Proxy
 
 .TP
-.BI wisprlogin " url"
-A specific URL to be given in WISPr XML LoginURL. Otherwise,
-.B uamserver
-is used. 
-
-.TP
 .BI uamsecret " secret"
 Shared secret between uamserver and chilli. This secret should be set
 in order not to compromise security.
@@ -729,11 +707,11 @@ Default interim-interval for RADIUS accounting unless otherwise set by RADIUS
 
 .TP
 .BI defbandwidthmaxdown
-Default bandwidth max down set in bps, same as WISPr-Bandwidth-Max-Down.
+Default bandwidth max down set in bps when not returned by RADIUS.
 
 .TP
 .BI defbandwidthmaxup
-Default bandwidth max up set in bps, same as WISPr-Bandwidth-Max-Up.
+Default bandwidth max up set in bps when not returned by RADIUS.
 
 .TP
 .B acctupdate
@@ -817,16 +795,8 @@ Allow clients to use any IP settings they wish by spoofing ARP
 Do not return to UAM server on login success, just redirect to original URL.
 
 .TP
-.B nouamwispr
-Do not do any WISPr XML, assume the back-end is doing this instead.
-
-.TP
 .B usestatusfile
 Write the status of clients in a non-volatile state file (experimental).
-
-.TP
-.B chillixml
-Return the so-called Chilli XML along with WISPr XML.
 
 .TP
 .B macauth

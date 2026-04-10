@@ -81,9 +81,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_CHILLISCRIPT
     "ENABLE_CHILLISCRIPT "
 #endif 
-#ifdef ENABLE_CHILLIXML
-    "ENABLE_CHILLIXML "
-#endif
 #ifdef ENABLE_DHCPRADIUS
     "ENABLE_DHCPRADIUS "
 #endif
@@ -399,7 +396,6 @@ int main(int argc, char **argv) {
     syslog(LOG_WARNING, "EAPOL not implemented. build with --enable-eapol");
 #endif
   _options.swapoctets = args_info.swapoctets_flag;
-  _options.chillixml = args_info.chillixml_flag;
   _options.macauth = args_info.macauth_flag;
   _options.macreauth = args_info.macreauth_flag;
   _options.macauthdeny = args_info.macauthdeny_flag;
@@ -410,8 +406,6 @@ int main(int argc, char **argv) {
   _options.macallowlocal = args_info.macallowlocal_flag;
   _options.strictmacauth = args_info.strictmacauth_flag;
   _options.strictdhcp = args_info.strictdhcp_flag;
-  _options.no_wispr1 = args_info.nowispr1_flag;
-  _options.no_wispr2 = args_info.nowispr2_flag;
   _options.wpaguests = args_info.wpaguests_flag;
   _options.openidauth = args_info.openidauth_flag;
   _options.challengetimeout = args_info.challengetimeout_arg;
@@ -1319,7 +1313,6 @@ int main(int argc, char **argv) {
   _options.uamurl = STRDUP(args_info.uamserver_arg);
   _options.uamaaaurl = STRDUP(args_info.uamaaaurl_arg);
   _options.uamhomepage = STRDUP(args_info.uamhomepage_arg);
-  _options.wisprlogin = STRDUP(args_info.wisprlogin_arg);
   _options.uamsecret = STRDUP(args_info.uamsecret_arg);
   _options.macsuffix = STRDUP(args_info.macsuffix_arg);
   _options.macpasswd = STRDUP(args_info.macpasswd_arg);
@@ -1333,8 +1326,6 @@ int main(int argc, char **argv) {
   _options.nasip = STRDUP(args_info.nasip_arg);
   _options.tundev = STRDUP(args_info.tundev_arg);
   _options.radiusnasid = STRDUP(args_info.radiusnasid_arg);
-  _options.radiuslocationid = STRDUP(args_info.radiuslocationid_arg);
-  _options.radiuslocationname = STRDUP(args_info.radiuslocationname_arg);
   _options.locationname = STRDUP(args_info.locationname_arg);
   _options.radiussecret = STRDUP(args_info.radiussecret_arg);
 #ifdef ENABLE_LARGELIMITS

@@ -310,13 +310,6 @@ if test x"$enable_sessdns" = xyes; then
    AC_DEFINE(ENABLE_SESSDNS,1,[Define to enable per session DNS enforcement])
 fi
 
-AC_ARG_ENABLE(chillixml, [AS_HELP_STRING([--enable-chillixml],[Enable use of chillixml])], 
-  enable_chillixml=$enableval, enable_chillixml=no)
-
-if test x"$enable_chillixml" = xyes; then
-   AC_DEFINE(ENABLE_CHILLIXML,1,[Define to enable Chilli XML])
-fi
-
 AC_ARG_ENABLE(proxyvsa, [AS_HELP_STRING([--enable-proxyvsa],[Enable support for VSA attribute proxy])], 
   enable_proxyvsa=$enableval, enable_proxyvsa=no)
 

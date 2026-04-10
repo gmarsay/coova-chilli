@@ -91,9 +91,6 @@ struct redir_state {
   /*  EAP identity of the last request sent */
   uint8_t eap_identity;
 
-  /* UAM protocol used */
-  uint8_t uamprotocol;
-
 #ifdef ENABLE_USERAGENT
   char useragent[REDIR_USERAGENTSIZE];
 #endif

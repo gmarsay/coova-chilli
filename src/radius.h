@@ -176,7 +176,6 @@
 #define RADIUS_TERMINATE_CAUSE_HOST_REQUEST         18
 
 #include "radius_pkt.h"
-#include "radius_wispr.h"
 #include "radius_coovachilli.h"
 
 struct radius_queue_t {      /* Holder for queued packets */

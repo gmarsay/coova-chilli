@@ -806,11 +806,10 @@ int runscript(struct app_conn_t *appconn, char* script,
   set_env("NAS_PORT_TYPE", VAL_STRING, "19", 0);
   set_env("ACCT_SESSION_ID", VAL_STRING, appconn->s_state.sessionid, 0);
   set_env("ACCT_INTERIM_INTERVAL", VAL_USHORT, &appconn->s_params.interim_interval, 0);
-  set_env("WISPR_LOCATION_ID", VAL_STRING, _options.radiuslocationid, 0);
-  set_env("WISPR_LOCATION_NAME", VAL_STRING, _options.radiuslocationname, 0);
-  set_env("WISPR_BANDWIDTH_MAX_UP", VAL_ULONG, &appconn->s_params.bandwidthmaxup, 0);
-  set_env("WISPR_BANDWIDTH_MAX_DOWN", VAL_ULONG, &appconn->s_params.bandwidthmaxdown, 0);
-  /*set_env("WISPR-SESSION_TERMINATE_TIME", VAL_USHORT, &appconn->sessionterminatetime, 0);*/
+  if (_options.locationname)
+    set_env("LOCATION_NAME", VAL_STRING, _options.locationname, 0);
+  set_env("BANDWIDTH_MAX_UP", VAL_ULONG, &appconn->s_params.bandwidthmaxup, 0);
+  set_env("BANDWIDTH_MAX_DOWN", VAL_ULONG, &appconn->s_params.bandwidthmaxdown, 0);
   set_env("COOVACHILLI_MAX_INPUT_OCTETS", VAL_ULONG64, &appconn->s_params.maxinputoctets, 0);
   set_env("COOVACHILLI_MAX_OUTPUT_OCTETS", VAL_ULONG64, &appconn->s_params.maxoutputoctets, 0);
   set_env("COOVACHILLI_MAX_TOTAL_OCTETS", VAL_ULONG64, &appconn->s_params.maxtotaloctets, 0);
@@ -1459,20 +1458,6 @@ int chilli_req_attrs(struct radius_t *radius,
   if (_options.radiusnasid) {
     radius_addattr(radius, pack, RADIUS_ATTR_NAS_IDENTIFIER, 0, 0, 0,
 		   (uint8_t*) _options.radiusnasid, strlen(_options.radiusnasid));
-  }
-
-  if (_options.radiuslocationid) {
-    radius_addattr(radius, pack, RADIUS_ATTR_VENDOR_SPECIFIC,
-		   RADIUS_VENDOR_WISPR, RADIUS_ATTR_WISPR_LOCATION_ID, 0,
-		   (uint8_t*) _options.radiuslocationid,
-		   strlen(_options.radiuslocationid));
-  }
-
-  if (_options.radiuslocationname) {
-    radius_addattr(radius, pack, RADIUS_ATTR_VENDOR_SPECIFIC,
-		   RADIUS_VENDOR_WISPR, RADIUS_ATTR_WISPR_LOCATION_NAME, 0,
-		   (uint8_t*) _options.radiuslocationname,
-		   strlen(_options.radiuslocationname));
   }
 
 #ifdef ENABLE_MODULES
@@ -3820,7 +3805,6 @@ config_radius_session(struct session_params *params,
   struct radius_attr_t *attr = NULL;
   size_t offset = 0;
   /*int is_splash = 0;*/
-  int seen;
 
   /* Session timeout */
   if (!radius_getattr(pack, &attr, RADIUS_ATTR_SESSION_TIMEOUT, 0, 0, 0))
@@ -3857,37 +3841,21 @@ config_radius_session(struct session_params *params,
   else if (!reconfig)
     params->interim_interval = 0;
 
-  /* Bandwidth up */
+  /* Bandwidth up (CoovaChilli VSA, kb/s in attribute, stored as b/s) */
   if (!radius_getattr(pack, &attr, RADIUS_ATTR_VENDOR_SPECIFIC,
-		      RADIUS_VENDOR_WISPR,
-		      RADIUS_ATTR_WISPR_BANDWIDTH_MAX_UP, 0))
-    params->bandwidthmaxup = ntohl(attr->v.i);
+		      RADIUS_VENDOR_COOVACHILLI,
+		      RADIUS_ATTR_COOVACHILLI_BANDWIDTH_MAX_UP, 0))
+    params->bandwidthmaxup = (uint64_t)ntohl(attr->v.i) * 1000;
   else if (!reconfig)
     params->bandwidthmaxup = 0;
 
   /* Bandwidth down */
   if (!radius_getattr(pack, &attr, RADIUS_ATTR_VENDOR_SPECIFIC,
-		      RADIUS_VENDOR_WISPR,
-		      RADIUS_ATTR_WISPR_BANDWIDTH_MAX_DOWN, 0))
-    params->bandwidthmaxdown = ntohl(attr->v.i);
-  else if (!reconfig)
-    params->bandwidthmaxdown = 0;
-
-#ifdef RADIUS_ATTR_COOVACHILLI_BANDWIDTH_MAX_UP
-  /* Bandwidth up */
-  if (!radius_getattr(pack, &attr, RADIUS_ATTR_VENDOR_SPECIFIC,
-		      RADIUS_VENDOR_COOVACHILLI,
-		      RADIUS_ATTR_COOVACHILLI_BANDWIDTH_MAX_UP, 0))
-    params->bandwidthmaxup = ntohl(attr->v.i) * 1000;
-#endif
-
-#ifdef RADIUS_ATTR_COOVACHILLI_BANDWIDTH_MAX_DOWN
-  /* Bandwidth down */
-  if (!radius_getattr(pack, &attr, RADIUS_ATTR_VENDOR_SPECIFIC,
 		      RADIUS_VENDOR_COOVACHILLI,
 		      RADIUS_ATTR_COOVACHILLI_BANDWIDTH_MAX_DOWN, 0))
-    params->bandwidthmaxdown = ntohl(attr->v.i) * 1000;
-#endif
+    params->bandwidthmaxdown = (uint64_t)ntohl(attr->v.i) * 1000;
+  else if (!reconfig)
+    params->bandwidthmaxdown = 0;
 
   /* Max input octets */
   if (!radius_getattr(pack, &attr, RADIUS_ATTR_VENDOR_SPECIFIC,
@@ -4046,82 +4014,7 @@ config_radius_session(struct session_params *params,
   }
 #endif
 
-  seen = 0;
-  offset = 0;
-  while (!radius_getnextattr(pack, &attr, RADIUS_ATTR_VENDOR_SPECIFIC,
-			     RADIUS_VENDOR_WISPR,
-			     RADIUS_ATTR_WISPR_REDIRECTION_URL,
-			     0, &offset)) {
-    ssize_t clen, nlen = (ssize_t) attr->l - 2;
-    char *url = (char*) attr->v.t;
-
-    if (seen == 0) { params->url[0]=0; seen=1; }
-    clen = strlen((char*)params->url);
-
-    if (clen + nlen > sizeof(params->url) - 1)
-      nlen = sizeof(params->url) - clen - 1;
-
-    if (nlen > 0) {
-      memcpy(params->url + clen, url, nlen);
-      params->url[clen + nlen] = 0;
-      params->flags |= UAM_CLEAR_URL;
-    }
-
-    /*if (!is_splash) {
-      params->flags |= REQUIRE_REDIRECT;
-      }*/
-  }
-
-  /* Session-Terminate-Time */
-  if (!radius_getattr(pack, &attr, RADIUS_ATTR_VENDOR_SPECIFIC,
-		      RADIUS_VENDOR_WISPR,
-		      RADIUS_ATTR_WISPR_SESSION_TERMINATE_TIME, 0)) {
-    char attrs[RADIUS_ATTR_VLEN + 1];
-    struct tm stt;
-    int tzhour, tzmin;
-    char *tz;
-    int result;
-
-    memcpy(attrs, attr->v.t, attr->l-2);
-    attrs[attr->l-2] = 0;
-
-    memset(&stt, 0, sizeof(stt));
-
-    result = sscanf(attrs, "%d-%d-%dT%d:%d:%d %d:%d",
-		    &stt.tm_year, &stt.tm_mon, &stt.tm_mday,
-		    &stt.tm_hour, &stt.tm_min, &stt.tm_sec,
-		    &tzhour, &tzmin);
-
-    if (result == 8) { /* Timezone */
-      /* tzhour and tzmin is hours and minutes east of GMT */
-      /* timezone is defined as seconds west of GMT. Excludes DST */
-      stt.tm_year -= 1900;
-      stt.tm_mon  -= 1;
-      stt.tm_hour -= tzhour; /* Adjust for timezone */
-      stt.tm_min  -= tzmin;  /* Adjust for timezone */
-      /*      stt.tm_hour += daylight;*/
-      /*stt.tm_min  -= (timezone / 60);*/
-      tz = getenv("TZ");
-      setenv("TZ", "", 1); /* Set environment to UTC */
-      tzset();
-      params->sessionterminatetime = mktime(&stt);
-      if (tz) setenv("TZ", tz, 1);
-      else    unsetenv("TZ");
-      tzset();
-    }
-    else if (result >= 6) { /* Local time */
-      tzset();
-      stt.tm_year -= 1900;
-      stt.tm_mon  -= 1;
-      stt.tm_isdst = -1; /*daylight;*/
-      params->sessionterminatetime = mktime(&stt);
-    }
-    else {
-      params->sessionterminatetime = 0;
-      syslog(LOG_WARNING, "Invalid WISPr-Session-Terminate-Time received: %s", attrs);
-    }
-  }
-  else if (!reconfig)
+  if (!reconfig)
     params->sessionterminatetime = 0;
 
   session_param_defaults(params);
@@ -4569,7 +4462,7 @@ int cb_radius_auth_conf(struct radius_t *radius,
 
   if (appconn->s_params.sessionterminatetime) {
     if (mainclock_rtdiff(appconn->s_params.sessionterminatetime) > 0) {
-      syslog(LOG_WARNING, "WISPr-Session-Terminate-Time in the past received, rejecting");
+      syslog(LOG_WARNING, "Session-Terminate-Time in the past received, rejecting");
       return dnprot_reject(appconn);
     }
   }

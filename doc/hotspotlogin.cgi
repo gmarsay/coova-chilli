@@ -68,8 +68,7 @@ if (!$debug && !($ENV{HTTPS} =~ /^on$/))
 	   "Login must use encrypted connection.");
 }
 
-if ($data{'button'} =~ /^Login$/ || 
-    ($data{'res'} eq "wispr" && $data{'username'} ne "")) 
+if ($data{'button'} =~ /^Login$/) 
 {
     $hexchal  = pack "H*", $data{'challenge'};
 
@@ -84,12 +83,7 @@ if ($data{'button'} =~ /^Login$/ ||
 
     $logonUrl = "http://$data{'uamip'}:$data{'uamport'}/logon?username=".&urlencode($data{'username'})."&";
 
-    if ($data{'wisprversion'} ne "" && $data{'wispreapmsg'} ne "") 
-    {
-	$logonUrl .= "WISPrEAPMsg=".&urlencode($data{'wispreapmsg'});
-	$logonUrl .= "&WISPrVersion=".&urlencode($data{'wisprversion'});
-    }
-    elsif ($ntresponse == 1) 
+    if ($ntresponse == 1) 
     {
 	# Encode plain text into NT-Password 
 	$response = `$chilli_response -nt "$data{'challenge'}" "$uamsecret" "$data{'username'}" "$data{'password'}"`;
@@ -141,10 +135,6 @@ elsif ($data{'res'} eq "already")
 elsif ($data{'res'} eq "notyet") 
 { 
     $result = 5;
-}
-elsif ($data{'res'} eq "wispr") 
-{ 
-    $result = 6;
 }
 elsif ($data{'res'} eq "popup1") 
 { 
@@ -377,22 +367,19 @@ $head
 }
 
 sub body() {
-    local($headline, $mesg, $wispr) = @_;
+    local($headline, $mesg) = @_;
     print "<body bgColor=\"$bgcolor\">
   <h1 style=\"text-align: center;\">$headline</h1>
   <center>
     $mesg
   </center>
 </body>
-<!--
-$wispr
--->
 </html>
 ";
 }
 
 sub page() {
-    local($title, $head, $headline, $mesg, $wispr) = @_;
+    local($title, $head, $headline, $mesg) = @_;
     &header($title, $head);
 }
 
@@ -401,33 +388,14 @@ sub redirect() {
     &header("CoovaChilli Login", 
 	    "<meta http-equiv=\"refresh\" content=\"0;url=$url\">");
     &body("Logging in to CoovaChilli",
-	"Please wait...",
-	"<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<WISPAccessGatewayParam 
-  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"
-  xsi:noNamespaceSchemaLocation=\"http://www.acmewisp.com/WISPAccessGatewayParam.xsd\">
-<AuthenticationReply>
-<MessageType>120</MessageType>
-<ResponseCode>201</ResponseCode>
-<LoginResultsURL>$url</LoginResultsURL>
-</AuthenticationReply> 
-</WISPAccessGatewayParam>");
+	"Please wait...");
     exit(0);
 }
 
 sub error() {
     local($title, $mesg) = @_;
     &header($title);
-    &body($title, $mesg, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<WISPAccessGatewayParam 
-  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"
-  xsi:noNamespaceSchemaLocation=\"http://www.acmewisp.com/WISPAccessGatewayParam.xsd\">
-<AuthenticationReply>
-<MessageType>120</MessageType>
-<ResponseCode>102</ResponseCode>
-<ReplyMessage>$mesg</ReplyMessage>
-</AuthenticationReply> 
-</WISPAccessGatewayParam>");
+    &body($title, $mesg);
     exit(0);
 }
 

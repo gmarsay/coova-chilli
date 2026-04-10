@@ -69,15 +69,8 @@
 #define REDIR_FAILED_TIMEOUT 58 /* Reply to /logon - no Radius Reply */
 #define REDIR_FAILED_MTU     59 /* Reply to /logon - authentication MTU is too big to send in a Radius packet */
 #define REDIR_FAILED_NOROUTE 60 /* Reply to /logon - no route for NAI */
-#define REDIR_ERROR_PROTOCOL 61 /* Reply to /logon - the client software is not matching the protocol (e.g. WISPr 1.0 or WISPr 2.0) */
+#define REDIR_ERROR_PROTOCOL 61 /* Reply to /logon - malformed or incomplete authentication request */
 #define REDIR_CHALLENGE      62 /* Reply to /logon - if Radius challenge received in EAP authentication */
-
-/* If more than one format flag is set, it indicates that Coova advertises several
-   protocols that can be used by the client. Once the client has choosen which protocol
-   to use, a single flag is set for the rest of the communication */
-#define REDIR_UAMPROT_WISPR1      1  /* Client and Coova use WISPr 1.0, WiFi Alliance to communicate */
-#define REDIR_UAMPROT_WISPR2      2  /* Client and Coova use WISPr 2.0, Wireless Broadband Alliance to communicate */
-#define REDIR_UAMPROT_CHILLI      4  /* Client and Coova use the proprietary XML Chilli protocol to communicate */
 
 #define REDIR_AUTH_NONE       0
 #define REDIR_AUTH_PAP        1

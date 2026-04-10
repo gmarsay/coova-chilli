@@ -78,8 +78,7 @@ HS_UAMFORMAT=http://\$HS_UAMLISTEN:\$HS_UAMUIPORT/www/login.chi
 #   Same principal goes for HS_UAMHOMEPAGE.
 HS_UAMHOMEPAGE=http://\$HS_UAMLISTEN:\$HS_UAMPORT/www/coova.html
 
-#   This option will be configured to be the WISPr LoginURL as well
-#   as provide "uamService" to the ChilliController. The UAM Service is
+#   This option can provide "uamService" to the ChilliController. The UAM Service is
 #   described in: http://www.coova.org/CoovaChilli/UAMService
 #
 # HS_UAMSERVICE=
@@ -122,9 +121,9 @@ HS_UAMHOMEPAGE=http://\$HS_UAMLISTEN:\$HS_UAMPORT/www/coova.html
 #
 # HS_DEFIDLETIMEOUT=0	   # Default idle-timeout if not defined by RADIUS (0 for unlimited)
 #
-# HS_DEFBANDWIDTHMAXDOWN=0   # Default WISPr-Bandwidth-Max-Down if not defined by RADIUS (0 for unlimited)
+# HS_DEFBANDWIDTHMAXDOWN=0   # Default max down bandwidth (bps) if not defined by RADIUS (0 for unlimited)
 #
-# HS_DEFBANDWIDTHMAXUP=0	   # Default WISPr-Bandwidth-Max-Up if not defined by RADIUS (0 for unlimited)
+# HS_DEFBANDWIDTHMAXUP=0	   # Default max up bandwidth (bps) if not defined by RADIUS (0 for unlimited)
 
 ###
 # Centralized configuration options examples
@@ -186,16 +185,10 @@ HS_PROVIDER_LINK=http://coova.github.io/
 
 
 ###
-#   WISPr RADIUS Attribute support
+#   Portal location label (optional; maps to chilli --locationname)
 #
 
-HS_LOC_NAME="My HotSpot"	   # WISPr Location Name and used in portal
-
-#   WISPr settings (to form a proper WISPr-Location-Id)
-# HS_LOC_NETWORK="My Network"	   # Network name
-# HS_LOC_AC=408			   # Phone area code
-# HS_LOC_CC=1			   # Phone country code
-# HS_LOC_ISOCC=US		   # ISO Country code
+HS_LOC_NAME="My HotSpot"
 
 # Embedded miniportal
 # HS_REG_MODE="tos" # or self, other

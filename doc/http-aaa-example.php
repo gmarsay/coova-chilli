@@ -105,7 +105,6 @@ switch ($_GET['stage']) {
    if (!$sent_reply) {
      do_auth_reject(array( // Attribute allowed in access-reject
 			  'Reply-Message' => $attrs['Reply-Message'],
-			  'WISPr-Redirection-URL' => $attrs['WISPr-Redirection-URL'],
 			  'CoovaChilli-Config' => $attrs['CoovaChilli-Config'],
 			  ));
    }
@@ -140,10 +139,8 @@ function set_max_output_octets (&$a, $v, $o = true) { set_attribute('CoovaChilli
 function set_max_total_kbytes  (&$a, $v, $o = true) { set_attribute('CoovaChilli-Max-Total-Octets',$a,($v*1000),$o); } 
 function set_max_input_kbytes  (&$a, $v, $o = true) { set_attribute('CoovaChilli-Max-Input-Octets',$a,($v*1000),$o); } 
 function set_max_output_kbytes (&$a, $v, $o = true) { set_attribute('CoovaChilli-Max-Output-Octets',$a,($v*1000),$o); } 
-function set_redirection_url   (&$a, $v, $o = true) { set_attribute('WISPr-Redirection-URL',$a,$v,$o); } 
+function set_redirection_url   (&$a, $v, $o = true) { set_attribute('CoovaChilli-Require-UAM',$a,$v,$o); } 
 
-#function set_max_bandwidth_up_bit_sec     (&$a, $v, $o = true) { set_attribute('WISPr-Bandwidth-Max-Up',$a,$v,$o); } 
-#function set_max_bandwidth_down_bit_sec   (&$a, $v, $o = true) { set_attribute('WISPr-Bandwidth-Max-Down',$a,$v,$o); } 
 function set_max_bandwidth_up_kbit_sec    (&$a, $v, $o = true) { set_attribute('CoovaChilli-Bandwidth-Max-Up',$a,$v,$o); } 
 function set_max_bandwidth_down_kbit_sec  (&$a, $v, $o = true) { set_attribute('CoovaChilli-Bandwidth-Max-Down',$a,$v,$o); } 
 function set_max_bandwidth_up_kbyte_sec   (&$a, $v, $o = true) { set_attribute('CoovaChilli-Bandwidth-Max-Up',$a,($v*8),$o); } 
@@ -401,7 +398,7 @@ function do_login_service(&$attrs) {
   $device = get_device();
 
 #echo "Auth: 1
-#WISPr-Redirection-URL: http://www.coova.com/
+#CoovaChilli-Require-UAM: http://www.coova.com/
 #Acct-Interim-Interval: 1440
 #Session-Timeout: 1800
 #Idle-Timeout: 1800

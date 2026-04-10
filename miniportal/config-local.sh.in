@@ -16,7 +16,6 @@
 
 . ./functions.sh
 . ./uam.sh
-. ./wispr.sh
 
 USERS=@ETCCHILLI@/localusers
 COOVA_USERURL=$COOKIE_COOVA_USERURL
@@ -209,7 +208,6 @@ dologin() {
 <meta http-equiv="refresh" content="0;url=$url"/>
 </head></html>
 ENDHTML
-    wisprLoginResultsURL "$url"
 }
 
 domail() {
@@ -226,33 +224,23 @@ FORM_username="${FORM_username:-$FORM_UserName}"
 FORM_username="${FORM_username:-$FORM_Username}"
 FORM_password="${FORM_password:-$FORM_Password}"
 
-# For WISPr 2.0 EAP, bounce back to chilli
-[ "$FORM_res" = "wispr" ] && \
-    [ "$FORM_WISPrEAPMsg" != "" ] && \
-    [ "$FORM_WISPrVersion" = "2.0" ] && {
-    http_redirect2 "http://$HS_UAMLISTEN:$HS_UAMPORT/login?username=$FORM_username&WISPrEAPMsg=$FORM_WISPrEAPMsg&WISPrVersion=2.0"
-}
-
 if [ "$FORM_uamip" != "" ] && [ "$HS_UAMSECRET" != "" ]
 then
-    if [ "$FORM_res" != "wispr" ]
-    then
-	QS=$(echo $QUERY_STRING | sed 's/&md=[^&=]*$//')
-	HTTP="http"
-	[ "$HTTPS" = "on" ] && HTTP="https"
-	URL="$HTTP://$SERVER_NAME/$REQUEST_URI?$QS"
-	CHECK="$URL$HS_UAMSECRET"
-	if [ -x /usr/bin/md5sum ] || [ -x /bin/md5sum ]; then
-	CHECK_MD5=$(echo -n "$CHECK" |md5sum|cut -d' ' -f1|tr 'a-z' 'A-Z');
-	fi
-	if [ -x /usr/bin/md5 ] || [ -x /sbin/md5 ] || [ -x /bin/md5 ]; then
-	CHECK_MD5=$(echo -n "$CHECK" |md5 |tr 'a-z' 'A-Z');
-	fi
-	if [ "$CHECK_MD5" = "$FORM_md" ]; then
-	    COOVA_USERURL=$FORM_userurl
-	else
-	    http_redirect "/www/error.chi"
-	fi
+    QS=$(echo $QUERY_STRING | sed 's/&md=[^&=]*$//')
+    HTTP="http"
+    [ "$HTTPS" = "on" ] && HTTP="https"
+    URL="$HTTP://$SERVER_NAME/$REQUEST_URI?$QS"
+    CHECK="$URL$HS_UAMSECRET"
+    if [ -x /usr/bin/md5sum ] || [ -x /bin/md5sum ]; then
+    CHECK_MD5=$(echo -n "$CHECK" |md5sum|cut -d' ' -f1|tr 'a-z' 'A-Z');
+    fi
+    if [ -x /usr/bin/md5 ] || [ -x /sbin/md5 ] || [ -x /bin/md5 ]; then
+    CHECK_MD5=$(echo -n "$CHECK" |md5 |tr 'a-z' 'A-Z');
+    fi
+    if [ "$CHECK_MD5" = "$FORM_md" ]; then
+	COOVA_USERURL=$FORM_userurl
+    else
+	http_redirect "/www/error.chi"
     fi
 fi
 

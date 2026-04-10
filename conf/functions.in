@@ -50,7 +50,6 @@ HS_MACAUTHMODE=${HS_MACAUTHMODE:-off}
 HS_USELOCALUSERS=${HS_USELOCALUSERS:-off}
 HS_OPENIDAUTH=${HS_OPENIDAUTH:-off}
 HS_ACCTUPDATE=${HS_ACCTUPDATE:-off}
-HS_WISPRLOGIN=${HS_WISPRLOGIN:-$HS_UAMSERVICE}
 HS_PAP_OK=${HS_PAP_OK:-on}
 HS_DNS1=${HS_DNS1:-$HS_DNS}
 HS_DNS1=${HS_DNS1:-$(grep '^nameserver' /etc/resolv.conf | head -n1 | awk '{print $2}')}
@@ -175,7 +174,6 @@ writeconfig() {
     [ "$HS_LOCATIONOPT82" = "on" ] && addconfig1 "locationopt82"
     [ "$HS_UAMHOMEPAGE" = "none" ] && HS_UAMHOMEPAGE=
     addconfig1 ${HS_UAMHOMEPAGE:+"uamhomepage $(eval echo $HS_UAMHOMEPAGE)"}
-    addconfig1 ${HS_WISPRLOGIN:+"wisprlogin $HS_WISPRLOGIN"}
     addconfig1 ${HS_WWWDIR:+"wwwdir $HS_WWWDIR"}
     addconfig1 ${HS_WWWBIN:+"wwwbin $HS_WWWBIN"}
     addconfig1 ${HS_UAMUIPORT:+"uamuiport $HS_UAMUIPORT"}
@@ -211,8 +209,6 @@ writeconfig() {
     addconfig1 ${HS_RADIUSQSIZE:+"radiusqsize $HS_RADIUSQSIZE"}
     addconfig1 ${HS_DHCPHASHSIZE:+"dhcphashsize $HS_DHCPHASHSIZE"}
 
-    [ "$HS_NOWISPR1" = "on" ] || [ "$HS_NOWISPR1" = "true" ] && addconfig1 "nowispr1"
-    [ "$HS_NOWISPR2" = "on" ] || [ "$HS_NOWISPR2" = "true" ] && addconfig1 "nowispr2"
     [ "$HS_WEB_ADMIN" = "http"  ] || [ "$HS_WEB_ADMIN" = "both" ] && webadmin="$webadmin,$HS_UAMLISTEN:80"
     [ "$HS_WEB_ADMIN" = "https" ] || [ "$HS_WEB_ADMIN" = "both" ] && webadmin="$webadmin,$HS_UAMLISTEN:443"
     [ "$HS_MACAUTHMODE" = "local" ] || [ "$HS_MACALLOWLOCAL" = "on" ] && addconfig1 "macallowlocal"
@@ -227,20 +223,6 @@ writeconfig() {
     [ -n "$HS_LOC_NAME" ] && {
 	loc_name=$(echo "$HS_LOC_NAME" | sed 's/"//g')
 	addconfig1 "locationname \"$loc_name\""
-	isocc=$(echo    "$HS_LOC_ISOCC"  | sed 's/[^a-zA-Z]//g')
-	cc=$(echo       "$HS_LOC_CC"     | sed 's/[^0-9]//g')
-	ac=$(echo       "$HS_LOC_AC"     | sed 's/[^0-9]//g')
-	network=$(echo  "$HS_LOC_NETWORK"| sed 's/[^a-zA-Z0-9]/_/g')
-	provider=$(echo "$HS_PROVIDER"   | sed 's/[^a-zA-Z0-9]/_/g')
-	[ -n "$provider" ] && provider="$provider,"
-	[ -n "$HS_SSID" ] && {
-	    [ -n "$network" ] && network="${network}_"
-	    network="$network$HS_SSID"
-	}
-	loc_name=$(echo "$HS_LOC_NAME"  | sed 's/[^a-zA-Z0-9]/_/g')
-	loc_id="isocc=$isocc,cc=$cc,ac=$ac,network=$provider$network"
-	addconfig1 "radiuslocationname \"$loc_name\""
-	addconfig1 "radiuslocationid \"$loc_id\""
     }
 
     # Application walled garden entries:

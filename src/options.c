@@ -289,8 +289,6 @@ int options_fromfd(int fd, bstring bt) {
   if (!option_s_l(bt, &o.radiusadmsecret)) return 0;
 #endif
   if (!option_s_l(bt, &o.radiusnasid)) return 0;
-  if (!option_s_l(bt, &o.radiuslocationid)) return 0;
-  if (!option_s_l(bt, &o.radiuslocationname)) return 0;
   if (!option_s_l(bt, &o.locationname)) return 0;
 #ifdef ENABLE_RADPROXY
   if (!option_s_l(bt, &o.proxysecret)) return 0;
@@ -315,7 +313,6 @@ int options_fromfd(int fd, bstring bt) {
   if (!option_s_l(bt, &o.uamurl)) return 0;
   if (!option_s_l(bt, &o.uamaaaurl)) return 0;
   if (!option_s_l(bt, &o.uamhomepage)) return 0;
-  if (!option_s_l(bt, &o.wisprlogin)) return 0;
 
   if (!option_s_l(bt, &o.wwwdir)) return 0;
   if (!option_s_l(bt, &o.wwwbin)) return 0;
@@ -484,8 +481,6 @@ int options_save(char *file, bstring bt) {
 #endif
 
   if (!option_s_s(bt, &o.radiusnasid)) return 0;
-  if (!option_s_s(bt, &o.radiuslocationid)) return 0;
-  if (!option_s_s(bt, &o.radiuslocationname)) return 0;
   if (!option_s_s(bt, &o.locationname)) return 0;
 #ifdef ENABLE_RADPROXY
   if (!option_s_s(bt, &o.proxysecret)) return 0;
@@ -510,7 +505,6 @@ int options_save(char *file, bstring bt) {
   if (!option_s_s(bt, &o.uamurl)) return 0;
   if (!option_s_s(bt, &o.uamaaaurl)) return 0;
   if (!option_s_s(bt, &o.uamhomepage)) return 0;
-  if (!option_s_s(bt, &o.wisprlogin)) return 0;
 
   if (!option_s_s(bt, &o.wwwdir)) return 0;
   if (!option_s_s(bt, &o.wwwbin)) return 0;
