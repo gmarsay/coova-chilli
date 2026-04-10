@@ -714,13 +714,7 @@ Accounting-Response.
 .BI wwwdir " path"
 Directory where embedded local web content is placed. This content is
 accessible using the URL format http://<uamlisten>:<uamport>/www/<filename>
-
-.TP
-.BI wwwbin " script"
-Executable to run as a CGI type program (like haserl) for URLs with extention 
-.B .chi
-- in the format
-http://<uamlisten>:<uamport>/www/<file>.chi 
+(static files such as .html, images, .css, etc.).
 
 .TP
 .BI uamui " script"

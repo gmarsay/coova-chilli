@@ -174,7 +174,6 @@ writeconfig() {
     [ "$HS_UAMHOMEPAGE" = "none" ] && HS_UAMHOMEPAGE=
     addconfig1 ${HS_UAMHOMEPAGE:+"uamhomepage $(eval echo $HS_UAMHOMEPAGE)"}
     addconfig1 ${HS_WWWDIR:+"wwwdir $HS_WWWDIR"}
-    addconfig1 ${HS_WWWBIN:+"wwwbin $HS_WWWBIN"}
     addconfig1 ${HS_UAMUIPORT:+"uamuiport $HS_UAMUIPORT"}
     addconfig1 ${HS_ADMUSR:+"adminuser \"$HS_ADMUSR\""}
     addconfig1 ${HS_ADMPWD:+"adminpasswd \"$HS_ADMPWD\""}

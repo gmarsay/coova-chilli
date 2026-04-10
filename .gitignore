@@ -1,4 +1,4 @@
-# Object files
+﻿# Object files
 *.o
 *.ko
 *.lo
@@ -37,8 +37,6 @@ json/Makefile.in
 json/json_config.h
 json/json_config.h.in
 json/stamp-h2
-miniportal/Makefile
-miniportal/Makefile.in
 src/Makefile
 src/Makefile.in
 src/mssl/Makefile
@@ -101,21 +99,6 @@ src/chilli_rtmon
 src/chilli_script
 
 www/config.sh
-miniportal/config-local.sh
-miniportal/contact.chi
-miniportal/error.chi
-miniportal/functions.sh
-miniportal/login.chi
-miniportal/map.chi
-miniportal/payment.chi
-miniportal/payment.sh
-miniportal/register.chi
-miniportal/service.chi
-miniportal/status.chi
-miniportal/terms.chi
-miniportal/tos.chi
-miniportal/uam.sh
-miniportal/wispr.sh
 
 src/cmdline.[ch]
 src/cmdline.c.orig

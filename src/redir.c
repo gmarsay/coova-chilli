@@ -2729,15 +2729,12 @@ int redir_main(struct redir_t *redir,
 
             if      (!strcmp(filename + (namelen - 5), ".html")) ctype = "text/html";
             else if (!strcmp(filename + (namelen - 4), ".gif"))  ctype = "image/gif";
-            else if (!strcmp(filename + (namelen - 3), ".js"))   ctype = "text/javascript";
             else if (!strcmp(filename + (namelen - 4), ".css"))  ctype = "text/css";
             else if (!strcmp(filename + (namelen - 4), ".jpg"))  ctype = "image/jpeg";
             else if (!strcmp(filename + (namelen - 4), ".mp4"))  ctype = "video/mp4";
             else if (!strcmp(filename + (namelen - 4), ".ogv"))  ctype = "video/ogg";
             else if (!strcmp(filename + (namelen - 4), ".png"))  ctype = "image/png";
             else if (!strcmp(filename + (namelen - 4), ".swf"))  ctype = "application/x-shockwave-flash";
-            else if (!strcmp(filename + (namelen - 4), ".chi")){ ctype = "text/html"; parse = 1; }
-            else if (!strcmp(filename + (namelen - 4), ".cjs")){ ctype = "text/javascript"; parse = 1; }
             else if (!strcmp(filename + (namelen - 5), ".json")) ctype = "application/json";
             else if (!strcmp(filename + (namelen - 4), ".dat")){ ctype = "application/x-ns-proxy-autoconfig";
 #ifdef ENABLE_WPAD
@@ -2767,11 +2764,6 @@ int redir_main(struct redir_t *redir,
           }
 
           if (parse) {
-
-            if (!_options.wwwbin) {
-              syslog(LOG_ERR, "the 'wwwbin' setting must be configured for CGI use");
-              return redir_main_exit(&socket, forked, rreq);
-            }
 
             if (ndelay_off(socket.fd[0])) {
               syslog(LOG_ERR, "%s: fcntl() failed", strerror(errno));
@@ -2916,31 +2908,16 @@ int redir_main(struct redir_t *redir,
             redir_chartohex(conn.s_state.redir.uamchal, buffer, REDIR_MD5LEN);
             setenv("CHI_CHALLENGE", buffer, 1);
 
-            switch (conn.type) {
 #ifdef ENABLE_WPAD
-              case REDIR_WPAD:
-                if (isWPAD && _options.wpadpacfile) {
-                  char *binqqargs[3] = { _options.wpadpacfile, 0 } ;
-                  if (_options.debug)
-                    syslog(LOG_DEBUG, "%s(%d): Running: %s", __FUNCTION__, __LINE__, _options.wpadpacfile);
-                  execv(*binqqargs, binqqargs);
-                  break;
-                }
-#endif
-              case REDIR_WWW:
-                /* XXX: Todo: look for malicious content! */
-                {
-                  char *binqqargs[3] = { _options.wwwbin, buffer, 0 } ;
-
-                  if (_options.debug)
-                    syslog(LOG_DEBUG, "%s(%d): Running: %s %s/%s", __FUNCTION__, __LINE__, _options.wwwbin, _options.wwwdir, filename);
-                  snprintf(buffer, sizeof(buffer), "%s/%s", _options.wwwdir, filename);
-
-                  execv(*binqqargs, binqqargs);
-                }
-                break;
+            if (conn.type == REDIR_WPAD && isWPAD && _options.wpadpacfile) {
+              char *binqqargs[2] = { _options.wpadpacfile, 0 } ;
+              if (_options.debug)
+                syslog(LOG_DEBUG, "%s(%d): Running: %s", __FUNCTION__, __LINE__, _options.wpadpacfile);
+              execv(*binqqargs, binqqargs);
             }
+#endif
 
+            syslog(LOG_ERR, "internal: no handler for parsed www request");
             return redir_main_exit(&socket, forked, rreq);
           }
 

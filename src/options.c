@@ -305,7 +305,6 @@ int options_fromfd(int fd, bstring bt) {
   if (!option_s_l(bt, &o.uamhomepage)) return 0;
 
   if (!option_s_l(bt, &o.wwwdir)) return 0;
-  if (!option_s_l(bt, &o.wwwbin)) return 0;
   if (!option_s_l(bt, &o.uamui)) return 0;
   if (!option_s_l(bt, &o.localusers)) return 0;
 #ifdef HAVE_SSL
@@ -454,7 +453,6 @@ int options_save(char *file, bstring bt) {
   if (!option_s_s(bt, &o.uamhomepage)) return 0;
 
   if (!option_s_s(bt, &o.wwwdir)) return 0;
-  if (!option_s_s(bt, &o.wwwbin)) return 0;
   if (!option_s_s(bt, &o.uamui)) return 0;
   if (!option_s_s(bt, &o.localusers)) return 0;
 #ifdef HAVE_SSL

@@ -293,7 +293,6 @@ struct options_t {
 
   /* local content */
   char *wwwdir;
-  char *wwwbin;
   char *uamui;
   char *localusers;
 

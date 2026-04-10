@@ -73,7 +73,7 @@ HS_UAMSERVER=$HS_UAMLISTEN
 #   Shell variable replacement takes place when evaluated, so here
 #   HS_UAMSERVER is escaped and later replaced by the pre-defined 
 #   HS_UAMSERVER to form the actual "--uamserver" option in chilli.
-HS_UAMFORMAT=http://\$HS_UAMLISTEN:\$HS_UAMUIPORT/www/login.chi
+HS_UAMFORMAT=http://\$HS_UAMLISTEN:\$HS_UAMUIPORT/www/coova.html
 
 #   Same principal goes for HS_UAMHOMEPAGE.
 HS_UAMHOMEPAGE=http://\$HS_UAMLISTEN:\$HS_UAMPORT/www/coova.html
@@ -168,15 +168,9 @@ HS_TYPE=coovachilli
 # HS_POSTAUTH_PROXYPORT=<port>
 
 #   Directory specifying where internal web pages can be served
-#   by chilli with url /www/<file name>. Only extentions like .html
-#   .jpg, .gif, .png, .js are allowed. See below for using .chi as a
-#   CGI extension.
+#   by chilli with url /www/<file name>. Extensions include .html,
+#   .jpg, .gif, .png, .css, .json, and a few media types.
 HS_WWWDIR=@ETCCHILLI@/www
-
-#   Using this option assumes 'haserl' is installed per-default
-#   but, and CGI type program can ran from wwwsh to process requests
-#   to chilli with url /www/filename.chi
-HS_WWWBIN=@ETCCHILLI@/wwwsh
 
 #   Some configurations used in certain user interfaces
 #
@@ -189,8 +183,3 @@ HS_PROVIDER_LINK=http://coova.github.io/
 #
 
 HS_LOC_NAME="My HotSpot"
-
-# Embedded miniportal
-# HS_REG_MODE="tos" # or self, other
-# HS_RAD_PROTO="pap" # or mschapv2, chap
-# HS_USE_MAP=on

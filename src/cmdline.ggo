@@ -148,7 +148,6 @@ option "strictdhcp"    - "Be strict about only allocating dyn-pool from DHCP" fl
 
 # "local" content
 option "wwwdir"      - "Local content served by chilli (for splash page, etc)" string no
-option "wwwbin"      - "Script binary (such as haserl) for simple web programming" string no
 option "uamui"       - "Program in inetd style to handle all uam requests" string no
 
 # Centralized Configuration

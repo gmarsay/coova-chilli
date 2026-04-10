@@ -1,4 +1,6 @@
 == ChangeLog (CoovaChilli-v1.8) ==
+* Drop UAM wwwbin/.chi/.cjs and static .js serving; ship only coova.html, coova.jpg, wait.gif under www/ (plus config.sh).
+* Remove unused miniportal tree (haserl sample portal sources).
 * Remove distro/openmoko packaging and OpenMoko-specific defaults in gui-config.
 * Remove Debian/RPM packaging trees and SUSE spec from the source tree.
 * RFC8910 - Captive Portal Identification (#593)

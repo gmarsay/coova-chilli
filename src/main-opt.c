@@ -814,7 +814,6 @@ int main(int argc, char **argv) {
 #endif
 
   _options.wwwdir = STRDUP(args_info.wwwdir_arg);
-  _options.wwwbin = STRDUP(args_info.wwwbin_arg);
   _options.uamui = STRDUP(args_info.uamui_arg);
   _options.localusers = STRDUP(args_info.localusers_arg);
   _options.uamurl = STRDUP(args_info.uamserver_arg);
