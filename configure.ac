@@ -146,6 +146,22 @@ strchr strcspn strdup strerror strncasecmp strndup strrchr strspn strstr strtol 
 glob getaddrinfo getnameinfo getifaddrs sysinfo strlcpy tzset snprintf vsnprintf vasprintf])
 AC_CHECK_LIB(resolv, res_init)
 
+dnl libbstring (Better String Library): required, via pkg-config module "bstring".
+dnl See https://github.com/msteinert/bstring — set PKG_CONFIG_PATH if installed in a prefix.
+AC_PATH_PROG([PKG_CONFIG], [pkg-config])
+AS_IF([test "x$PKG_CONFIG" = x], [
+  AC_MSG_ERROR([pkg-config is required to locate libbstring])])
+AC_MSG_CHECKING([for libbstring via pkg-config])
+AS_IF([$PKG_CONFIG --exists bstring], [
+  AC_MSG_RESULT([yes])
+  BSTRING_CFLAGS=`$PKG_CONFIG --cflags bstring`
+  BSTRING_LIBS=`$PKG_CONFIG --libs bstring`
+], [
+  AC_MSG_RESULT([no])
+  AC_MSG_ERROR([pkg-config module bstring not found; install libbstring (e.g. msteinert/bstring) and ensure bstring.pc is on PKG_CONFIG_PATH])])
+AC_SUBST([BSTRING_CFLAGS])
+AC_SUBST([BSTRING_LIBS])
+
 dnl === Feature set (fixed): former stock defaults + always-on largelimits & JSON + bundled json/ ===
 AC_DEFINE([ENABLE_CHILLIQUERY], [1], [Define to enable chilli_query])
 AM_CONDITIONAL([WITH_CHILLIQUERY], [test yes = yes])
@@ -198,7 +214,6 @@ AM_CONDITIONAL([HAVE_STRLCPY], [test "x$ac_cv_func_strlcpy" = xyes])
 
 AC_SUBST(sysconfdir)
 AC_CONFIG_FILES([Makefile
-		 bstring/Makefile
 		 conf/Makefile
 		 doc/Makefile
 		 json/Makefile

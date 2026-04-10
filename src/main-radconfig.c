@@ -78,7 +78,7 @@ int static chilliauth() {
     return 1;
   }
 
-  if (radius_new(&radius, &_options.radiuslisten, 0, 0, 0)) {
+  if (radius_new(&radius, &_options.radiuslisten, 0, 0)) {
     syslog(LOG_ERR, "radius_new: Failed to create radius");
     return ret;
   }

@@ -198,6 +198,8 @@ struct options_t {
   uint8_t uamauthedallowed:1;
   uint8_t postauth_proxyssl:1;
   uint8_t nochallenge:1;
+  uint8_t usetap:1;               /* Use TAP instead of TUN */
+  uint8_t noarpentries:1;         /* TAP: skip ARP table entries */
 
 #ifdef USING_MMAP
   uint8_t mmapring:1;

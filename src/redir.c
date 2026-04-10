@@ -1886,7 +1886,7 @@ static int redir_radius(struct redir_t *redir, struct in_addr *addr,
 
   int n, m;
 
-  if (radius_new(&radius, &redir->radiuslisten, 0, 0, 0)) {
+  if (radius_new(&radius, &redir->radiuslisten, 0, 0)) {
     syslog(LOG_ERR, "radius_new: Failed to create radius");
     return -1;
   } 

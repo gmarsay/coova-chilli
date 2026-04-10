@@ -12,7 +12,7 @@ chilli.h session.h garden.h radius.h options.h \
 tun.h ippool.h md5.h redir.h dhcp.h iphash.h \
 radius_coovachilli.h ssl.h dns.h net.h \
 pkt.h conn.h lookup.h chilli_limits.h cmdline.h debug.h \
-radius_pkt.h ../bstring/bstrlib.h ../config.h system.h \
+radius_pkt.h ../config.h system.h \
 cmdsock.h
 
 lib_LTLIBRARIES = libchilli.la
@@ -37,14 +37,13 @@ chilli_response_SOURCES = main-response.c
 chilli_query_SOURCES = main-query.c 
 chilli_opt_SOURCES = main-opt.c cmdline.c
 
-libchilli_la_LIBADD = $(top_builddir)/bstring/libbstring.la \
-	$(top_builddir)/json/libjson.la
+libchilli_la_LIBADD = $(BSTRING_LIBS) $(top_builddir)/json/libjson.la
 
 if WITH_OPENSSL
 libchilli_la_LIBADD += ${LIBSSL}
 endif
 
-LDADD = libchilli.la ${LIBRT} $(top_builddir)/bstring/libbstring.la ${LIBJSON} \
+LDADD = libchilli.la ${LIBRT} $(BSTRING_LIBS) ${LIBJSON} \
 	$(top_builddir)/json/libjson.la
 
 if WITH_OPENSSL
@@ -52,12 +51,14 @@ LDADD += ${LIBSSL}
 endif
 
 AM_CFLAGS = -D_GNU_SOURCE -Wall -fno-builtin -fno-strict-aliasing \
-  -fomit-frame-pointer -funroll-loops -pipe -I$(top_builddir)/bstring \
+  -fomit-frame-pointer -funroll-loops -pipe \
  -I$(top_builddir)/json \
  -DDEFCHILLICONF='"$(sysconfdir)/chilli.conf"'\
  -DDEFPIDFILE='"$(localstatedir)/run/chilli.pid"'\
  -DDEFSTATEDIR='"$(localstatedir)/run"'\
- -DSBINDIR='"$(sbindir)"' 
+ -DSBINDIR='"$(sbindir)"'
+
+AM_CFLAGS += $(BSTRING_CFLAGS)
 
 if WITH_NETFILTER_COOVA
 SUBDIRS += linux

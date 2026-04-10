@@ -1,0 +1,22 @@
+# Vérification de compilation (debian:bookworm).
+# libbstring n'est pas dans bookworm : on compile msteinert/bstring, puis coova-chilli.
+#   docker build --no-cache -f Dockerfile.buildcheck -t coova-chilli-buildcheck .
+FROM debian:bookworm
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+    build-essential autoconf automake libtool pkg-config \
+    libssl-dev libjson-c-dev gengetopt \
+    meson ninja-build git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp/bstring-build
+RUN git clone --depth 1 --branch v1.1.0 https://github.com/msteinert/bstring.git . \
+    && meson setup build --prefix=/usr/local -Ddefault_library=shared \
+    && meson compile -C build \
+    && meson install -C build \
+    && ldconfig
+
+ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib/x86_64-linux-gnu/pkgconfig:/usr/local/share/pkgconfig
+
+WORKDIR /src
+COPY . .
+RUN autoreconf -fi && ./configure && make -j$(nproc)
