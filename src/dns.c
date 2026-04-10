@@ -256,12 +256,6 @@ dns_copy_res(struct dhcp_conn_t *conn, int q,
       }
     }
 
-#ifdef ENABLE_UAMDOMAINFILE
-    if (!isReq && *qmatch == -1 && _options.uamdomainfile) {
-      *qmatch = garden_check_domainfile((char *) question);
-    }
-#endif
-
 #ifdef ENABLE_IPV6
     if (_options.ipv6) {
       if (isReq && type == 28) {

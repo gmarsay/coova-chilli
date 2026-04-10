@@ -105,10 +105,4 @@ void garden_patricia_load_list(patricia_tree_t **pptree,
 void garden_patricia_reload(void);
 #endif
 
-#ifdef ENABLE_UAMDOMAINFILE
-void garden_load_domainfile(void);
-void garden_free_domainfile(void);
-int  garden_check_domainfile(char *question);
-#endif
-
 #endif

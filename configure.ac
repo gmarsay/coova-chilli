@@ -296,13 +296,6 @@ if test x"$enable_ipwhitelist" = xyes; then
    AC_DEFINE(ENABLE_IPWHITELIST,1,[Define to support file based whitelists])
 fi
 
-AC_ARG_ENABLE(uamdomainfile, [AS_HELP_STRING([--enable-uamdomainfile],[Enable loading of mass uamdomains from file])], 
-  enable_uamdomainfile=$enableval, enable_uamdomainfile=no)
-
-if test x"$enable_uamdomainfile" = xyes; then
-   AC_DEFINE(ENABLE_UAMDOMAINFILE,1,[Define to support loading of uamdomains (with regex) from file])
-fi
-
 AC_ARG_ENABLE(ieee8021q, [AS_HELP_STRING([--disable-ieee8021q],[disable support for IEEE 802.1Q])], 
   enable_ieee8021q=$enableval, enable_ieee8021q=yes)
 

@@ -84,9 +84,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_DHCPOPT
     "ENABLE_DHCPOPT "
 #endif
-#ifdef ENABLE_UAMDOMAINFILE
-    "ENABLE_UAMDOMAINFILE "
-#endif
 #ifdef ENABLE_EAPOL
     "ENABLE_EAPOL "
 #endif
@@ -164,9 +161,6 @@ static const char *compile_options = "Compiled with "
 #endif
 #ifdef ENABLE_UAMANYIP
     "ENABLE_UAMANYIP "
-#endif
-#ifdef ENABLE_UAMDOMAINFILE
-    "ENABLE_UAMDOMAINFILE "
 #endif
 #ifdef ENABLE_UAMUIPORT
     "ENABLE_UAMUIPORT "
@@ -1150,13 +1144,6 @@ int main(int argc, char **argv) {
 #else
   if (args_info.ipwhitelist_arg)
     syslog(LOG_ERR, "option ipwhitelist given when no support built-in");
-#endif
-
-#ifdef ENABLE_UAMDOMAINFILE
-  _options.uamdomainfile = STRDUP(args_info.uamdomainfile_arg);
-#else
-  if (args_info.uamdomainfile_arg)
-    syslog(LOG_ERR, "option uamdomainfile given when no support built-in");
 #endif
 
 #ifdef ENABLE_RADPROXY

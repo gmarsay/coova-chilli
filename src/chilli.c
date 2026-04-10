@@ -6327,10 +6327,6 @@ int chilli_main(int argc, char **argv) {
       chilli_auth_radius(radius);
     }
 
-#ifdef ENABLE_UAMDOMAINFILE
-    garden_load_domainfile();
-#endif
-
 #ifdef HAVE_PATRICIA
     garden_patricia_reload();
 #endif
@@ -6457,10 +6453,6 @@ int chilli_main(int argc, char **argv) {
 #ifdef HAVE_PATRICIA
         garden_patricia_reload();
 #endif
-
-#ifdef ENABLE_UAMDOMAINFILE
-        garden_load_domainfile();
-#endif
       }
 
       if (do_interval) {
@@ -6584,10 +6576,6 @@ int chilli_main(int argc, char **argv) {
     if (radsec_pid > 0) {
       kill(radsec_pid, SIGTERM);
     }
-#endif
-
-#ifdef ENABLE_UAMDOMAINFILE
-    garden_free_domainfile();
 #endif
 
     selfpipe_finish();

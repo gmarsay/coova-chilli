@@ -361,10 +361,6 @@ struct options_t {
   char *ipwhitelist;
 #endif
 
-#ifdef ENABLE_UAMDOMAINFILE
-  char *uamdomainfile;
-#endif
-
   /* Command-Socket */
   char *cmdsocket;
   uint16_t cmdsocketport;

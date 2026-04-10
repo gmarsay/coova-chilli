@@ -252,8 +252,6 @@ option "redirssl"  - "Enable redirection of SSL/HTTP port (requires SSL support)
 option "uamuissl"  - "Enable SSL/HTTPS support on the uamuiport" flag off
 
 option "ipwhitelist" - "Binary IP White List file" string no
-option "uamdomainfile" - "Load uamdomains (regex) from file" string no
-
 option "patricia" - "Use patricia tries for walled garden lookup" flag off
 option "kname" - "Enable the use of the coova kernel module instance of this namem" string no
 

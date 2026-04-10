@@ -330,9 +330,6 @@ int options_fromfd(int fd, bstring bt) {
 #ifdef ENABLE_IPWHITELIST
   if (!option_s_l(bt, &o.ipwhitelist)) return 0;
 #endif
-#ifdef ENABLE_UAMDOMAINFILE
-  if (!option_s_l(bt, &o.uamdomainfile)) return 0;
-#endif
 
   if (!option_s_l(bt, &o.adminuser)) return 0;
   if (!option_s_l(bt, &o.adminpasswd)) return 0;
@@ -484,9 +481,6 @@ int options_save(char *file, bstring bt) {
 #endif
 #ifdef ENABLE_IPWHITELIST
   if (!option_s_s(bt, &o.ipwhitelist)) return 0;
-#endif
-#ifdef ENABLE_UAMDOMAINFILE
-  if (!option_s_s(bt, &o.uamdomainfile)) return 0;
 #endif
 
   if (!option_s_s(bt, &o.adminuser)) return 0;
