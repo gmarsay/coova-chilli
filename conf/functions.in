@@ -133,7 +133,6 @@ writeconfig() {
     [ "$HS_NATANYIP" = "on" ] && addconfig1 "uamnatanyip"
     [ "$HS_NOC2C" = "on" ] && addconfig1 "noc2c"
     [ "$HS_REDIR" = "on" ] && addconfig2 "redir"
-    [ "$HS_REDIRDNSREQ" = "on" ] && addconfig2 "redirdnsreq"
 
     addconfig1 ${HS_LEASE:+"lease \"$HS_LEASE\""}
 

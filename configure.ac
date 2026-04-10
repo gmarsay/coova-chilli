@@ -303,13 +303,6 @@ if test x"$enable_uamdomainfile" = xyes; then
    AC_DEFINE(ENABLE_UAMDOMAINFILE,1,[Define to support loading of uamdomains (with regex) from file])
 fi
 
-AC_ARG_ENABLE(redirdnsreq, [AS_HELP_STRING([--enable-redirdnsreq],[Enable the sending of a DNS query on redirect])], 
-  enable_redirdnsreq=$enableval, enable_redirdnsreq=no)
-
-if test x"$enable_redirdnsreq" = xyes; then
-   AC_DEFINE(ENABLE_REDIRDNSREQ,1,[Define to DNS query on redirect to pick up dynamic walled garden])
-fi
-
 AC_ARG_ENABLE(ieee8021q, [AS_HELP_STRING([--disable-ieee8021q],[disable support for IEEE 802.1Q])], 
   enable_ieee8021q=$enableval, enable_ieee8021q=yes)
 

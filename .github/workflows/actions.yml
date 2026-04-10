@@ -22,7 +22,7 @@ jobs:
         ./configure --enable-largelimits --enable-proxyvsa --enable-miniportal \
         --enable-chilliredir --enable-chilliproxy --enable-binstatusfile \
         --enable-chilliscript --enable-chilliradsec --with-avl \
-        --enable-eapol --enable-uamdomainfile --enable-redirdnsreq --enable-modules \
+        --enable-eapol --enable-uamdomainfile --enable-modules \
         --enable-multiroute --enable-extadmvsa --with-openssl --with-poll \
         --enable-json --enable-libjson --prefix=/var/tmp/coova
     - name: Build

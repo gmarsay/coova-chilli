@@ -255,8 +255,6 @@ option "ipwhitelist" - "Binary IP White List file" string no
 option "uamdomainfile" - "Load uamdomains (regex) from file" string no
 
 option "patricia" - "Use patricia tries for walled garden lookup" flag off
-option "redirdnsreq" - "Send DNS query on redirect to pick of DNS based walled garden" flag off
-
 option "kname" - "Enable the use of the coova kernel module instance of this namem" string no
 
 option "dhcpopt" - "Set a DHCP option using a hex string" string no multiple

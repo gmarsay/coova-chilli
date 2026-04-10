@@ -23,7 +23,7 @@ config.status: configure
 	--enable-proxyvsa --enable-miniportal --enable-chilliredir \
 	--enable-chilliproxy --enable-binstatusfile --enable-chilliscript \
 	--enable-chilliradsec --enable-eapol \
-	--enable-uamdomainfile --enable-redirdnsreq --enable-modules \
+	--enable-uamdomainfile --enable-modules \
 	--enable-multiroute --enable-extadmvsa --with-openssl --with-poll \
 	--enable-json --enable-libjson
 

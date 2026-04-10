@@ -220,7 +220,6 @@ struct options_t {
   uint8_t domaindnslocal:1;         /* Wildcard option to consider all hostnames *.domain local */
   uint8_t radsec:1;                 /* Use RadSec tunneling */
   uint8_t noradallow:1;             /* Authorize all sessions when RADIUS is not available */
-  uint8_t redirdnsreq:1;
   uint8_t routeonetone:1;
   uint8_t statusfilesave:1;
   uint8_t dhcpnotidle:1;

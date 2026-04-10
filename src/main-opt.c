@@ -141,9 +141,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_EXTADMVSA
     "ENABLE_EXTADMVSA "
 #endif
-#ifdef ENABLE_REDIRDNSREQ
-    "ENABLE_REDIRDNSREQ "
-#endif
 #ifdef ENABLE_SESSDHCP
     "ENABLE_SESSDHCP "
 #endif
@@ -436,11 +433,6 @@ int main(int argc, char **argv) {
     syslog(LOG_ERR, "chilli_radsec not implemented. build with --enable-chilliradsec");
 #endif
   _options.noradallow = args_info.noradallow_flag;
-  _options.redirdnsreq = args_info.redirdnsreq_flag;
-#if(_debug_ && !defined(ENABLE_REDIRDNSREQ))
-  if (_options.redirdnsreq)
-    syslog(LOG_ERR, "redirdnsreq not implemented. build with --enable-redirdnsreq");
-#endif
 
 #ifdef ENABLE_IPV6
   _options.ipv6 = args_info.ipv6_flag;
