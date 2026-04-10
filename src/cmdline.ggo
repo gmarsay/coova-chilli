@@ -68,9 +68,6 @@ option "rcvbuf" - "RCVBUF size (in kb)" int default="0" no
 
 option "childmax" - "Maximum number of child processes" int default="128" no
 
-option "peerid" - "Cluster peer ID" int default="0" no
-option "peerkey" - "Cluster Blowfish key" string no
-
 # Radius parameters
 option "radiuslisten"       - "IP address to send from"       string no
 option "radiusserver1"      - "IP address of radius server 1" string no
@@ -241,9 +238,6 @@ option "challengetimeout" - "Timeout in seconds for the generated challenge" int
 option "challengetimeout2" - "Timeout in seconds for challenge during login" int default="1200" no
 
 option "redir"  - "Enable redir (redirection) daemon" flag off
-option "inject"  - "Enable redir injection" string no
-option "injectext"  - "Enable redir injection extended script" string no
-option "injectwispr"  - "Enable redir injection of WISPr" flag off
 
 option "redirurl"  - "Send redirection URL in UAM parameters instead of HTTP redirect" flag off
 
@@ -268,8 +262,6 @@ option "uamuissl"  - "Enable SSL/HTTPS support on the uamuiport" flag off
 option "ipwhitelist" - "Binary IP White List file" string no
 option "uamdomainfile" - "Load uamdomains (regex) from file" string no
 
-option "layer3" - "Layer3 only" flag off
-option "ipsrcallowed"  - "List of allowed source IP addresses, for Layer3" string no multiple
 option "patricia" - "Use patricia tries for walled garden lookup" flag off
 option "redirdnsreq" - "Send DNS query on redirect to pick of DNS based walled garden" flag off
 

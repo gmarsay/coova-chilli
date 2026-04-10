@@ -136,7 +136,6 @@ writeconfig() {
     [ "$HS_REDIR" = "on" ] && addconfig2 "redir"
     [ "$HS_REDIRDNSREQ" = "on" ] && addconfig2 "redirdnsreq"
 
-    [ "$HS_LAYER3" = "on" ] && addconfig1 "layer3"
     addconfig1 ${HS_LEASE:+"lease \"$HS_LEASE\""}
 
     [ "$HS_USER" != "" -a "$HS_UID" = "" ] && HS_UID=$(id -u $HS_USER)
@@ -208,9 +207,6 @@ writeconfig() {
     HS_UAMALLOW=$(echo $HS_UAMALLOW|sed 's/ /,/g')
     uamallow=${HS_UAMALLOW:+",$HS_UAMALLOW"}
 
-    HS_IPSRCALLOWED=$(echo $HS_IPSRCALLOWED|sed 's/ /,/g')
-    addconfig1 ${HS_IPSRCALLOWED:+"ipsrcallowed $HS_IPSRCALLOWED"}
-
     addconfig1 ${HS_MAXCLIENTS:+"maxclients $HS_MAXCLIENTS"}
     addconfig1 ${HS_RADIUSQSIZE:+"radiusqsize $HS_RADIUSQSIZE"}
     addconfig1 ${HS_DHCPHASHSIZE:+"dhcphashsize $HS_DHCPHASHSIZE"}
@@ -280,9 +276,6 @@ writeconfig() {
 	[ -n "$HS_UAMALIASNAME" ] && addconfig2 "uamaliasname \"$HS_UAMALIASNAME\""
 	[ -n "$HS_ADMINUPDATEFILE" ] && addconfig2 "adminupdatefile \"$HS_ADMINUPDATEFILE\""
 	[ -n "$HS_UAMSECRET" ] && addconfig2 "uamsecret \"$HS_UAMSECRET\""
-	[ -n "$HS_INJECT" ] && addconfig2 "inject \"$HS_INJECT\""
-	[ -n "$HS_INJECTEXT" ] && addconfig2 "injectext \"$HS_INJECTEXT\""
-
 	test ${HS_DEFSESSIONTIMEOUT:-0} -gt 0 && addconfig2 "defsessiontimeout $HS_DEFSESSIONTIMEOUT"
 	test ${HS_DEFIDLETIMEOUT:-0} -gt 0 && addconfig2 "defidletimeout $HS_DEFIDLETIMEOUT"
 	test ${HS_CHALLENGETIMEOUT:-0} -gt 0 && addconfig2 "challengetimeout $HS_CHALLENGETIMEOUT"

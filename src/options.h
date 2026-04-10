@@ -142,9 +142,6 @@ struct options_t {
 
   int childmax;
 
-  uint8_t peerid;
-  char *peerkey;
-
   /* XXX */
   uint8_t nexthop[PKT_ETH_ALEN];
 #ifdef ENABLE_NETNAT
@@ -189,7 +186,6 @@ struct options_t {
 #endif
 
   /* booleans */
-  uint8_t layer3;                   /* Layer3 only support */
   uint8_t allowdyn:1;               /* Allow dynamic address allocation */
   uint8_t allowstat:1;              /* Allow static address allocation */
   uint8_t dhcpusemac:1;             /* Use given MAC or interface default */
@@ -281,17 +277,9 @@ struct options_t {
   uint8_t location_immediate_update:1;
   uint8_t location_option_82:1;
 #endif
-#ifdef ENABLE_REDIRINJECT
-  uint8_t inject_wispr:1;
-#endif
   /* */
 #ifdef EX_OPTIONS
 #include EX_OPTIONS
-#endif
-
-#ifdef ENABLE_REDIRINJECT
-  char *inject;
-  char *inject_ext;
 #endif
 
 #ifdef ENABLE_EXTADMVSA
@@ -315,11 +303,6 @@ struct options_t {
 #ifdef ENABLE_CHILLIREDIR
   regex_pass_through regex_pass_throughs[MAX_REGEX_PASS_THROUGHS];
   uint32_t regex_num_pass_throughs;
-#endif
-
-#ifdef ENABLE_LAYER3
-  pass_through ipsrc_pass_throughs[MAX_IPSRC_PASS_THROUGHS];
-  uint32_t ipsrc_num_pass_throughs;
 #endif
 
   char* captiveportalapi_uri; /* RFC 8910 Captive Portal API URI, nullptr if not used. */

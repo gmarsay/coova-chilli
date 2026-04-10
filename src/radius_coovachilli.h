@@ -71,8 +71,6 @@
 #define RADIUS_ATTR_COOVACHILLI_DHCP_DOMAIN               65 /* string */
 #define RADIUS_ATTR_COOVACHILLI_DHCP_RELAY                66 /* ipaddr */
 
-#define RADIUS_ATTR_COOVACHILLI_INJECT_URL                70 /* string */
-
 #define RADIUS_ATTR_COOVACHILLI_POSTAUTHPROXY_ADDRESS     75 /* ipaddr */
 #define RADIUS_ATTR_COOVACHILLI_POSTAUTHPROXY_PORT        76 /* integer */
 

@@ -210,9 +210,6 @@ int net_open(net_interface *netif) {
   net_gflags(netif);
 
   if (
-#ifdef ENABLE_LAYER3
-          !_options.layer3 &&
-#endif
 #ifdef HAVE_NETFILTER_COOVA
           (_options.uamlisten.s_addr == _options.dhcplisten.s_addr) && 
 #endif

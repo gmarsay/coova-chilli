@@ -38,21 +38,15 @@ int session_redir_json_fmt(bstring json, char *userurl, char *redirurl,
   }
   bcatcstr(json,"\",\"ipAddress\":\"");
   bcatcstr(json, inet_ntoa(*hisip));
-#ifdef ENABLE_LAYER3
-  if (!_options.layer3) {
-#endif
-    bcatcstr(json,"\",\"macAddress\":\"");
-    if (hismac) {
-      char mac[REDIR_MACSTRLEN+1];
-      snprintf(mac, sizeof(mac), "%.2X-%.2X-%.2X-%.2X-%.2X-%.2X",
-                    (unsigned int)hismac[0], (unsigned int)hismac[1],
-                    (unsigned int)hismac[2], (unsigned int)hismac[3],
-                    (unsigned int)hismac[4], (unsigned int)hismac[5]);
-      bcatcstr(json, mac);
-    }
-#ifdef ENABLE_LAYER3
+  bcatcstr(json,"\",\"macAddress\":\"");
+  if (hismac) {
+    char mac[REDIR_MACSTRLEN+1];
+    snprintf(mac, sizeof(mac), "%.2X-%.2X-%.2X-%.2X-%.2X-%.2X",
+                  (unsigned int)hismac[0], (unsigned int)hismac[1],
+                  (unsigned int)hismac[2], (unsigned int)hismac[3],
+                  (unsigned int)hismac[4], (unsigned int)hismac[5]);
+    bcatcstr(json, mac);
   }
-#endif
   bcatcstr(json,"\"}");
   return 0;
 }

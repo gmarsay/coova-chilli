@@ -32,37 +32,6 @@ static int max_requests = 0;
 static redir_request * requests = 0;
 static redir_request * requests_free = 0;
 
-#ifdef ENABLE_REDIRINJECT
-static bstring inject_fmt(redir_request *req, struct redir_conn_t *conn) {
-  char *url = req->inject_url;
-  if (req->ibuf->slen) return req->ibuf;
-  if (!url || !*url) url = _options.inject;
-  if (!url || !*url) return 0;
-
-  bassigncstr(req->ibuf, "");
-  if (conn) {
-    char hexchal[1+(2*REDIR_MD5LEN)];
-    extern void redir_wispr2_reply
-        (struct redir_t *redir, struct redir_conn_t *conn,
-         int res, long int timeleft, char* hexchal,
-         char* reply, char* redirurl, bstring b);
-    redir_chartohex(conn->s_state.redir.uamchal, hexchal, REDIR_MD5LEN);
-    redir_wispr2_reply(req->parent, conn,
-		       REDIR_NOTYET, 0, hexchal, 0, 0, req->ibuf);
-  }
-
-  if (_options.inject_ext) {
-    bcatcstr(req->ibuf, "<script type=\"text/javascript\">");
-    bcatcstr(req->ibuf, _options.inject_ext);
-    bcatcstr(req->ibuf, "</script>");
-  }
-  bcatcstr(req->ibuf, "<script src='");
-  bcatcstr(req->ibuf, url);
-  bcatcstr(req->ibuf, "'></script>");
-  return req->ibuf;
-}
-#endif
-
 static bstring string_init_reset(bstring s) {
   if (!s) return bfromcstr("");
   bassigncstr(s, "");
@@ -224,17 +193,6 @@ static int redir_conn_finish(struct conn_t *conn, void *ctx) {
 
   if (req->socket_fd) {
 
-#ifdef ENABLE_REDIRINJECT
-    /**
-       if (0 && *req->inject_url && req->html && !req->chunked) {
-       char b[256];
-       char *inject = inject_fmt(req);
-       int w = net_write(req->socket_fd, inject, strlen(inject));
-       syslog(LOG_DEBUG, "injected %d bytes", w);
-       }
-    */
-#endif
-
     if (req->state & REDIR_SOCKET_FD) {
       net_select_rmfd(&sctx, req->socket_fd);
     }
@@ -344,157 +302,12 @@ static int redir_conn_read(struct conn_t *conn, void *ctx) {
     redir_conn_finish(conn, ctx);
 
   } else if (r > 0) {
-#ifdef ENABLE_REDIRINJECT
-    bstring inject = inject_fmt(req, 0);
-#endif
-
     bb[r]=0;
     req->last_active = mainclock_tick();
 
-#ifdef ENABLE_REDIRINJECT
-
-    /**
-     *
-     */
-    if (inject && !req->headers) {
-      char *newline = "\r\n\r\n";
-      char *eoh;
-
-      bcatblk(req->hbuf, bb, r);
-
-      if ((eoh = strstr((char *)req->hbuf->data, newline))) {
-
-	int header_len = eoh - (char *)req->hbuf->data;
-	bstring newhdr = bfromcstr("");
-
-	if (strncmp((char *)req->hbuf->data, "HTTP/1.", 7) ||
-	    strncmp((char *)req->hbuf->data+8, " 2", 2)) {
-
-	  syslog(LOG_DEBUG, "Not HTTP/1.X 2XX reply");
-	  bcatblk(newhdr, req->hbuf->data, header_len + 4);
-
-	} else {
-
-	  char *hdr, *p;
-	  int clen = 0;
-
-	  hdr = (char *)req->hbuf->data;
-
-	  while (hdr && *hdr) {
-	    int l;
-
-	    p = strstr(hdr, "\r\n");
-
-	    if (p == hdr) {
-	      break;
-	    } else if (p) {
-	      l = (p - hdr);
-	    } else {
-	      l = (eoh - hdr);
-	    }
-
-	    if (!strncasecmp(hdr, "content-length:", 15)) {
-	      char c = hdr[l];
-	      hdr[l] = 0;
-	      clen = req->clen = atoi(hdr+15);
-	      syslog(LOG_DEBUG, "Detected Content Length %d", req->clen);
-	      hdr[l] = c;
-	    } else if (!strncasecmp(hdr, "content-type:", 13)) {
-	      if (strstr(hdr, "text/html")) {
-		req->html = 1;
-	      }
-	    } else if (strcasestr(hdr, "content-encoding: gzip")) {
-	      req->gzip = 1;
-	    } else if (strcasestr(hdr, "transfer-encoding:") &&
-		       strstr(hdr,"chunked")) {
-	      req->chunked = 1;
-	    }
-
-	    hdr += l + 2;
-	    if (!p) break;
-	  }
-
-	  hdr = (char *)req->hbuf->data;
-
-	  while (hdr && *hdr) {
-	    int l;
-	    int skip = 0;
-
-	    p = strstr(hdr, "\r\n");
-
-	    if (p == hdr) {
-	      break;
-	    } else if (p) {
-	      l = (p - hdr);
-	    } else {
-	      l = (eoh - hdr);
-	    }
-
-	    if (req->html) {
-	      if (clen && !strncasecmp(hdr, "content-length:", 15)) {
-		char tmp[128];
-		if (inject) clen += inject->slen;
-		snprintf(tmp, sizeof(tmp), "Content-Length: %d\r\n", clen);
-		bcatcstr(newhdr, tmp);
-		skip = 1;
-	      } else if (!strncasecmp(hdr, "connection:", 11)) {
-		skip = 1;
-	      } else if (!strncasecmp(hdr, "accept-ranges:", 14)) {
-		skip = 1;
-	      }
-	    }
-
-	    syslog(LOG_DEBUG, "Resp Header [%d] %.*s%s",
-                   l, l, hdr, skip ? " [Skipped]" : "");
-
-	    if (!skip) {
-	      bcatblk(newhdr, hdr, l + 2);
-	    }
-
-	    hdr += l + 2;
-	    if (!p) break;
-	  }
-
-	  bcatcstr(newhdr, "Connection: close\r\n");
-
-	  /* process headers */
-	  /* Is HTML */
-	  /* Check content-encoding chunked */
-	  /* Adjust content-length */
-
-	  bcatblk(newhdr, newline, 2);
-
-	  if (req->html) {
-	    if (req->chunked) {
-	      char tmp[56];
-	      snprintf(tmp, sizeof(tmp), "%x\r\n",
-			    inject->slen);
-	      bcatcstr(newhdr, tmp);
-	    }
-	    bconcat(newhdr, inject);
-	    if (req->chunked) {
-	      bcatblk(newhdr, newline, 2);
-	    }
-	  }
-	}
-
-	bcatblk(newhdr, eoh + 4, req->hbuf->slen - header_len - 4);
-	if (req->clen > 0) /* adjust clen */
-	  req->clen -= (req->hbuf->slen - header_len - 4);
-	redir_cli_write(req, newhdr->data, newhdr->slen);
-	req->headers = 1;
-	bdestroy(newhdr);
-      }
-    } else {
-#endif
-
-      redir_cli_write(req, bb, r);
-      if (req->clen > 0)
-	req->clen -= r;
-
-#ifdef ENABLE_REDIRINJECT
-    }
-#endif
+    redir_cli_write(req, bb, r);
+    if (req->clen > 0)
+      req->clen -= r;
   }
   /*syslog(LOG_DEBUG, "leaving redir_conn_read()");*/
   return 0;
@@ -538,134 +351,64 @@ redir_handle_url(struct redir_t *redir,
   int i = -1;
   char *p = 0;
 
-#ifdef ENABLE_REDIRINJECT
-  char hasInject = 0;
-  if (conn->s_params.flags & UAM_INJECT_URL) {
-    strlcpy((char *) req->inject_url,
-            (char *) conn->s_params.url,
-            REDIRINJECT_MAX);
-    matches = hasInject = 1;
-  } else if (_options.inject && *_options.inject) {
-    strlcpy((char *) req->inject_url,
-            (char *) _options.inject,
-            REDIRINJECT_MAX);
-    matches = hasInject = 1;
-  } else {
-#endif
-    for (i=0; i < MAX_REGEX_PASS_THROUGHS; i++) {
+  for (i=0; i < MAX_REGEX_PASS_THROUGHS; i++) {
 
-      if ( ! _options.regex_pass_throughs[i].inuse )
-	break;
+    if ( ! _options.regex_pass_throughs[i].inuse )
+      break;
 
-      /*
-	if ( ! _options.regex_pass_throughs[i].regex_host[0] &&
-	! _options.regex_pass_throughs[i].regex_path[0] &&
-	! _options.regex_pass_throughs[i].regex_qs[0] )
-	break;
-      */
+    /*
+      if ( ! _options.regex_pass_throughs[i].regex_host[0] &&
+      ! _options.regex_pass_throughs[i].regex_path[0] &&
+      ! _options.regex_pass_throughs[i].regex_qs[0] )
+      break;
+    */
 
 #if(_debug_)
-      syslog(LOG_DEBUG, "REGEX host=[%s] path=[%s] qs=[%s]",
-             _options.regex_pass_throughs[i].regex_host,
-             _options.regex_pass_throughs[i].regex_path,
-             _options.regex_pass_throughs[i].regex_qs);
+    syslog(LOG_DEBUG, "REGEX host=[%s] path=[%s] qs=[%s]",
+           _options.regex_pass_throughs[i].regex_host,
+           _options.regex_pass_throughs[i].regex_path,
+           _options.regex_pass_throughs[i].regex_qs);
 
-      syslog(LOG_DEBUG, "Host %s", httpreq->host);
+    syslog(LOG_DEBUG, "Host %s", httpreq->host);
 #endif
 
-      if (_options.regex_pass_throughs[i].regex_host[0]) {
-	switch(check_regex(&_options.regex_pass_throughs[i].re_host,
-			   _options.regex_pass_throughs[i].regex_host,
-			   httpreq->host)) {
-          case -1: return -1;
-          case 1: matches = _options.regex_pass_throughs[i].neg_host; break;
-          case 0: matches = !_options.regex_pass_throughs[i].neg_host; break;
-	}
+    if (_options.regex_pass_throughs[i].regex_host[0]) {
+      switch(check_regex(&_options.regex_pass_throughs[i].re_host,
+                         _options.regex_pass_throughs[i].regex_host,
+                         httpreq->host)) {
+        case -1: return -1;
+        case 1: matches = _options.regex_pass_throughs[i].neg_host; break;
+        case 0: matches = !_options.regex_pass_throughs[i].neg_host; break;
       }
-
-      if (matches && _options.regex_pass_throughs[i].regex_path[0]) {
-	switch(check_regex(&_options.regex_pass_throughs[i].re_path,
-			   _options.regex_pass_throughs[i].regex_path,
-			   httpreq->path)) {
-          case -1: return -1;
-          case 1: matches = _options.regex_pass_throughs[i].neg_path; break;
-          case 0: matches = !_options.regex_pass_throughs[i].neg_path; break;
-	}
-      }
-
-      if (matches && _options.regex_pass_throughs[i].regex_qs[0]) {
-	switch(check_regex(&_options.regex_pass_throughs[i].re_qs,
-			   _options.regex_pass_throughs[i].regex_qs,
-			   httpreq->qs)) {
-          case -1: return -1;
-          case 1: matches = _options.regex_pass_throughs[i].neg_qs; break;
-          case 0: matches = !_options.regex_pass_throughs[i].neg_qs; break;
-	}
-      }
-
-      if (matches) break;
     }
-#ifdef ENABLE_REDIRINJECT
+
+    if (matches && _options.regex_pass_throughs[i].regex_path[0]) {
+      switch(check_regex(&_options.regex_pass_throughs[i].re_path,
+                         _options.regex_pass_throughs[i].regex_path,
+                         httpreq->path)) {
+        case -1: return -1;
+        case 1: matches = _options.regex_pass_throughs[i].neg_path; break;
+        case 0: matches = !_options.regex_pass_throughs[i].neg_path; break;
+      }
+    }
+
+    if (matches && _options.regex_pass_throughs[i].regex_qs[0]) {
+      switch(check_regex(&_options.regex_pass_throughs[i].re_qs,
+                         _options.regex_pass_throughs[i].regex_qs,
+                         httpreq->qs)) {
+        case -1: return -1;
+        case 1: matches = _options.regex_pass_throughs[i].neg_qs; break;
+        case 0: matches = !_options.regex_pass_throughs[i].neg_qs; break;
+      }
+    }
+
+    if (matches) break;
   }
-#endif
 
   if (matches) {
     syslog(LOG_DEBUG, "Matched for Host %s", httpreq->host);
 
     req->proxy = 1;
-
-#ifdef ENABLE_REDIRINJECT
-    /* XXX */
-    /* Check for headers we wish to filter out */
-    if (hasInject) {
-      bstring newhdr = bfromcstr("");
-      char *hdr = (char *)req->wbuf->data;
-
-      if (_options.inject_wispr)
-	(void) inject_fmt(req, conn);
-
-      while (hdr && *hdr) {
-	char *p = strstr(hdr, "\r\n");
-	int skip = 0;
-	int l;
-
-	if (p) {
-	  l = (p - hdr);
-	} else {
-	  l = req->wbuf->slen - (hdr - (char*)req->wbuf->data);
-	}
-
-	if (!strncasecmp(hdr, "accept-encoding:", 16)) {
-	  bcatcstr(newhdr, "Accept-Encoding: identity\r\n");
-	  skip = 1;
-	} else if (!strncasecmp(hdr, "connection:", 11)) {
-	  bcatcstr(newhdr, "Connection: close\r\n");
-	  skip = 1;
-	} else if (!strncasecmp(hdr, "keep-alive:", 11)) {
-	  skip = 1;
-	}
-
-	if (!skip)
-	  bcatblk(newhdr, hdr, l);
-
-	if (p) {
-	  if (!skip)
-	    bcatblk(newhdr, p, 2);
-	  hdr = p + 2;
-	} else {
-	  hdr = 0;
-	}
-      }
-
-      if (req->wbuf->slen != newhdr->slen) {
-	syslog(LOG_DEBUG, "Changed HTTP Headers");
-      }
-
-      bassign(req->wbuf, newhdr);
-      bdestroy(newhdr);
-    }
-    /* XXX */
-#endif
 
     if ((p = strchr(httpreq->host, ':'))) {
       *p++ = 0;

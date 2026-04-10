@@ -76,8 +76,6 @@ ATTRIBUTE       CoovaChilli-DHCP-Gateway		       64	ipaddr
 ATTRIBUTE       CoovaChilli-DHCP-Domain		       65	string
 ATTRIBUTE       CoovaChilli-DHCP-Relay		       66	ipaddr
 
-ATTRIBUTE       CoovaChilli-Inject-URL		       70	string
-
 ATTRIBUTE       CoovaChilli-PostAuthProxy-Address       75	ipaddr
 ATTRIBUTE       CoovaChilli-PostAuthProxy-Port	       76	integer
 

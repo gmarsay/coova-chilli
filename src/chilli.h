@@ -60,9 +60,6 @@ extern size_t strlcpy(char *dst, const char *src, size_t dsize);
 #define DNPROT_EAPOL      5
 #endif
 #define DNPROT_MAC        6
-#ifdef ENABLE_LAYER3
-#define DNPROT_LAYER3     7
-#endif
 
 /* Debug facility */
 #define DEBUG_DHCP        2
@@ -187,30 +184,12 @@ extern struct radius_t *radius;          /* Radius client instance */
 extern struct dhcp_t *dhcp;              /* DHCP instance */
 extern struct tun_t *tun;                /* TUN/TAP instance */
 
-#ifdef ENABLE_CLUSTER
-struct chilli_peer {
-  struct in_addr addr;
-  uint8_t mac[6];
-  uint8_t state;
-  time_t last_update;
-};
-#define PEER_STATE_OFFLINE 0
-#define PEER_STATE_ACTIVE  1
-#define PEER_STATE_STANDBY 2
-#define PEER_STATE_ADMCMD  3
-#define PEER_STATE_MODULE  4
-#endif
-
 #ifdef ENABLE_STATFILE
 int printstatus(void);
 int loadstatus(void);
 #endif
 
 int chilli_connect(struct app_conn_t **appconn, struct dhcp_conn_t *conn);
-
-#ifdef ENABLE_LAYER3
-struct app_conn_t * chilli_connect_layer3(struct in_addr *src, struct dhcp_conn_t *conn);
-#endif
 
 int chilli_getconn(struct app_conn_t **conn, uint32_t ip,
 		   uint32_t nasip, uint32_t nasport);
@@ -322,7 +301,9 @@ int chilli_getconn_byroute(struct app_conn_t **conn, int idx);
 
 uint8_t* chilli_called_station(struct session_state *state);
 
+#ifdef ENABLE_CHILLIQUERY
 int chilli_cmd(struct cmdsock_request *req, bstring s, int sock);
+#endif
 
 int chilli_handle_signal(void *ctx, int fd);
 void chilli_freeconn(void);

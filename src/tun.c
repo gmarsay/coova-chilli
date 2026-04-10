@@ -1066,12 +1066,6 @@ int tun_runscript(struct tun_t *tun, char* script, int wait) {
   set_env("UAMUIPORT", VAL_STRING, b, 0);
 #endif
 
-#ifdef ENABLE_LAYER3
-  if (_options.layer3) {
-    set_env("LAYER3", VAL_STRING, "1", 0);
-  }
-#endif
-
 #ifdef ENABLE_IEEE8021Q
   if (_options.ieee8021q)
     set_env("IEEE8021Q", VAL_STRING, "1" , 0);

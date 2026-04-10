@@ -607,15 +607,6 @@ fi
 
 AM_CONDITIONAL(WITH_CHILLISCRIPT, [test x"$enable_chilliscript" = xyes])
 
-AC_ARG_ENABLE(cluster, [AS_HELP_STRING([--enable-cluster],[Enable support for clustering])], 
-  enable_cluster=$enableval, enable_cluster=no)
-
-if test x"$enable_cluster" = xyes; then
-   AC_DEFINE(ENABLE_CLUSTER,1,[Define to enable cluster])
-fi
-
-AM_CONDITIONAL(WITH_CLUSTER, [test x"$enable_cluster" = xyes])
-
 AC_ARG_ENABLE(sessionstate, [AS_HELP_STRING([--enable-sessionstate],[Enable extended use of the CoovaChilli-Session-State attribute])], 
   enable_sessionstate=$enableval, enable_sessionstate=no)
 
@@ -736,13 +727,6 @@ if test x"$enable_ssdp" = xyes ; then
    AC_DEFINE(ENABLE_SSDP,1,[Define to enable Simple Service Discovery Protocol])
 fi
 
-AC_ARG_ENABLE(layer3, [AS_HELP_STRING([--enable-layer3],[Enable support for Layer3 only operation])], 
-  enable_layer3=$enableval, enable_layer3=no)
-
-if test x"$enable_layer3" = xyes ; then
-   AC_DEFINE(ENABLE_LAYER3,1,[Define to enable Layer3 only support])
-fi
-
 AC_ARG_ENABLE(modules, [AS_HELP_STRING([--enable-modules],[Enable dynamically loadable modules (experimental)])], 
   enable_modules=$enableval, enable_modules=no)
 
@@ -758,15 +742,6 @@ AC_ARG_ENABLE(extadmvsa, [AS_HELP_STRING([--enable-extadmvsa],[Enable admin-user
 if test x"$enable_extadmvsa" = xyes; then
    AC_DEFINE(ENABLE_EXTADMVSA,1,[Define to enable admin-user VSA support])
 fi
-
-AC_ARG_ENABLE(redirinject, [AS_HELP_STRING([--enable-redirinject],[Enable Redir content-injection support])], 
-  enable_redirinject=$enableval, enable_redirinject=no)
-
-if test x"$enable_redirinject" = xyes; then
-   AC_DEFINE(ENABLE_REDIRINJECT,1,[Define to Redir content-injection support])
-fi
-
-AM_CONDITIONAL(WITH_REDIRINJECT, [test x"$enable_redirinject" = xyes])
 
 AC_ARG_ENABLE(netnat, [AS_HELP_STRING([--enable-netnat],[Enable net interface nat (experimental)])], 
   enable_netnat=$enableval, enable_netnat=no)

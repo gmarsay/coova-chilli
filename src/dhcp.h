@@ -99,9 +99,6 @@ struct dhcp_t; /* Forward declaration */
 #define DHCP_AUTH_AUTH_TOS    4
 #define DHCP_AUTH_DNAT        5
 #define DHCP_AUTH_SPLASH      6
-#ifdef ENABLE_LAYER3
-#define DHCP_AUTH_ROUTER      7
-#endif
 
 #define DHCP_DOMAIN_LEN      30
 
@@ -121,10 +118,6 @@ struct dhcp_conn_t {
   struct dhcp_conn_t *prev;     /* Previous in linked list. 0: First */
   struct dhcp_t *parent;        /* Parent of all connections */
   void *peer;                   /* Peer protocol handler */
-
-#ifdef ENABLE_CLUSTER
-  uint8_t peerid;
-#endif
 
   uint8_t inuse:1;             /* Free = 0; Inuse = 1 */
   uint8_t noc2c:1;             /* Prevent client to client access using /32 subnets */
@@ -361,13 +354,6 @@ int dhcp_gettag(struct dhcp_packet_t *pack, size_t length,
 		struct dhcp_tag_t **tag, uint8_t tagtype);
 
 int dhcp_hashadd(struct dhcp_t *this, struct dhcp_conn_t *conn);
-
-#ifdef ENABLE_CLUSTER
-void dhcp_peer_update(char force);
-void print_peers(bstring s);
-struct chilli_peer;
-struct chilli_peer * get_chilli_peer(int id);
-#endif
 
 struct app_conn_t * dhcp_get_appconn_ip
 (struct dhcp_conn_t *conn, struct in_addr *dst);

@@ -214,11 +214,6 @@ typedef struct _redir_request {
 #define REDIR_CONN_FD   (1<<1)
   char state;
 
-#ifdef ENABLE_REDIRINJECT
-#define REDIRINJECT_MAX 256
-  char inject_url[REDIRINJECT_MAX];
-#endif
-
   struct _redir_request *prev, *next;
 
 } redir_request;

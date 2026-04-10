@@ -84,9 +84,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_CHILLIXML
     "ENABLE_CHILLIXML "
 #endif
-#ifdef ENABLE_CLUSTER
-    "ENABLE_CLUSTER "
-#endif
 #ifdef ENABLE_DHCPRADIUS
     "ENABLE_DHCPRADIUS "
 #endif
@@ -135,9 +132,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_LARGELIMITS
     "ENABLE_LARGELIMITS "
 #endif
-#ifdef ENABLE_LAYER3
-    "ENABLE_LAYER3 "
-#endif
 #ifdef ENABLE_LEAKYBUCKET
     "ENABLE_LEAKYBUCKET "
 #endif
@@ -179,9 +173,6 @@ static const char *compile_options = "Compiled with "
 #endif
 #ifdef ENABLE_REDIRDNSREQ
     "ENABLE_REDIRDNSREQ "
-#endif
-#ifdef ENABLE_REDIRINJECT
-    "ENABLE_REDIRINJECT "
 #endif
 #ifdef ENABLE_SESSDHCP
     "ENABLE_SESSDHCP "
@@ -381,11 +372,6 @@ int main(int argc, char **argv) {
   _options.num_pass_throughs = 0;
 
   /** simple configuration parameters **/
-  _options.layer3 = args_info.layer3_flag;
-#if(_debug_ && !defined(ENABLE_LAYER3))
-  if (_options.layer3)
-    syslog(LOG_WARNING, "layer3 not implemented. build with --enable-layer3");
-#endif
   _options.uid = args_info.uid_arg;
   _options.gid = args_info.gid_arg;
   _options.mtu = args_info.mtu_arg;
@@ -495,11 +481,6 @@ int main(int argc, char **argv) {
     syslog(LOG_ERR, "chilli_radsec not implemented. build with --enable-chilliradsec");
 #endif
   _options.noradallow = args_info.noradallow_flag;
-  _options.peerid = args_info.peerid_arg;
-#if(_debug_ && !defined(ENABLE_CLUSTER))
-  if (_options.peerid)
-    syslog(LOG_ERR, "clustering not implemented. build with --enable-cluster");
-#endif
   _options.redirdnsreq = args_info.redirdnsreq_flag;
 #if(_debug_ && !defined(ENABLE_REDIRDNSREQ))
   if (_options.redirdnsreq)
@@ -842,19 +823,6 @@ int main(int argc, char **argv) {
 #endif
                               );
   }
-#ifdef ENABLE_LAYER3
-  for (numargs = 0; numargs < args_info.ipsrcallowed_given; ++numargs) {
-    pass_throughs_from_string(_options.ipsrc_pass_throughs,
-			      MAX_IPSRC_PASS_THROUGHS,
-			      &_options.ipsrc_num_pass_throughs,
-			      args_info.ipsrcallowed_arg[numargs], 0, 0
-#ifdef HAVE_PATRICIA
-			      , 0
-#endif
-                              );
-  }
-#endif
-
   _options.uamauthedallowed = args_info.uamauthedallowed_flag;
 #ifdef ENABLE_AUTHEDALLOWED
   for (numargs = 0; numargs < args_info.authedallowed_given; ++numargs) {
@@ -1297,12 +1265,6 @@ int main(int argc, char **argv) {
   }
 #endif
 
-#ifdef ENABLE_REDIRINJECT
-  _options.inject = STRDUP(args_info.inject_arg);
-  _options.inject_ext = STRDUP(args_info.injectext_arg);
-  _options.inject_wispr = args_info.injectwispr_flag;
-#endif
-
 #ifdef ENABLE_EXTADMVSA
   if (args_info.extadmvsa_given) {
     for (numargs = 0; numargs < args_info.extadmvsa_given
@@ -1349,7 +1311,6 @@ int main(int argc, char **argv) {
   }
 #endif
 
-  _options.peerkey = STRDUP(args_info.peerkey_arg);
   _options.routeif = STRDUP(args_info.routeif_arg);
   _options.wwwdir = STRDUP(args_info.wwwdir_arg);
   _options.wwwbin = STRDUP(args_info.wwwbin_arg);

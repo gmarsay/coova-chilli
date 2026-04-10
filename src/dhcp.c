@@ -36,151 +36,6 @@ struct dhcp_ctx {
   int idx;
 };
 
-#ifdef ENABLE_CLUSTER
-int chilli_peer_count = 0;
-struct chilli_peer * chilli_peers = 0;
-struct chilli_peer * get_chilli_peer(int id) {
-  if (id < 0) id = _options.peerid;
-  if (_options.peerid >= 8) {
-    syslog(LOG_ERR, "Valid PEERID is 0-7!");
-    exit(-1);
-  }
-  if (!chilli_peers) {
-    /* initialize */
-    struct chilli_peer *p;
-    chilli_peers = (struct chilli_peer *)calloc(8, sizeof(struct chilli_peer));
-    p = chilli_peers + _options.peerid;
-    memcpy(p->mac, dhcp_nexthop(dhcp), PKT_ETH_ALEN);
-    memcpy(&p->addr, &_options.uamlisten, sizeof(_options.uamlisten));
-    if (_options.peerid == 0)
-      p->state = PEER_STATE_ACTIVE;
-    else
-      p->state = PEER_STATE_STANDBY;
-  }
-  if (id < 8)
-    return chilli_peers + id;
-  return 0;
-}
-
-void print_peers(bstring s) {
-  time_t now = mainclock_now();
-  char line[512];
-  int i;
-
-  for (i=0; i<8; i++) {
-    struct chilli_peer *peer = chilli_peers + i;
-    int age = (int)(now - peer->last_update);
-    char *state = "";
-
-    switch(peer->state) {
-      case PEER_STATE_ACTIVE:
-        state = "Active";
-        break;
-      case PEER_STATE_STANDBY:
-        state = "Standby";
-        break;
-      case PEER_STATE_OFFLINE:
-        state = "Offline";
-        age = 0;
-        break;
-      case PEER_STATE_ADMCMD:
-        state = "AdminCmd";
-        break;
-      case PEER_STATE_MODULE:
-        state = "Module";
-        break;
-    }
-
-    snprintf(line, sizeof(line),
-		  "Peer %d %-4s "MAC_FMT" "
-		  "/ %-16s %-8s %d sec",
-		  i, _options.peerid == i ? "(*)" : "",
-		  MAC_ARG(peer->mac),
-		  inet_ntoa(peer->addr), state, age);
-
-    bcatcstr(s, line);
-    bcatcstr(s, "\n");
-  }
-}
-
-int dhcp_send_chilli(uint8_t *pkt, size_t len) {
-  return 0;
-}
-
-static
-int dhcp_sendCHILLI(uint8_t type, struct in_addr *addr, uint8_t *mac) {
-  EVP_CIPHER_CTX ctx;
-
-  uint8_t packet[1500];
-
-  struct pkt_ethhdr_t *packet_ethh;
-  struct pkt_chillihdr_t chilli_hdr;
-  unsigned char *outbuf;
-
-  int datalen = 0;
-  int olen = 0;
-  int tlen = 0;
-
-  int ret = -1;
-
-  unsigned char iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
-
-  if (_options.peerkey == 0)
-    _options.peerkey = "hello!";
-
-  /* Get packet default values */
-  memset(packet, 0, sizeof(packet));
-  packet_ethh = pkt_ethhdr(packet);
-  outbuf = (unsigned char *)chilli_ethhdr(packet);
-
-  packet_ethh->prot = htons(PKT_ETH_PROTO_CHILLI);
-  memcpy(packet_ethh->dst, bmac, PKT_ETH_ALEN);
-  memcpy(packet_ethh->src, dhcp_nexthop(dhcp), PKT_ETH_ALEN);
-
-  chilli_hdr.from = _options.peerid;
-  chilli_hdr.type = type;
-
-  if (!addr || !mac) {
-    struct chilli_peer *p = get_chilli_peer(-1);
-    addr = &p->addr;
-    mac = p->mac;
-    chilli_hdr.state = p->state;
-  }
-
-  memcpy(&chilli_hdr.addr, addr, sizeof(*addr));
-  memcpy(chilli_hdr.mac, mac, PKT_ETH_ALEN);
-
-  EVP_CIPHER_CTX_init(&ctx);
-  EVP_EncryptInit(&ctx, EVP_bf_cbc(),
-		  (const unsigned char *)_options.peerkey, iv);
-
-  if (EVP_EncryptUpdate (&ctx, outbuf, &olen,
-			 (const unsigned char *) &chilli_hdr,
-			 sizeof(chilli_hdr)) != 1) {
-    syslog(LOG_ERR, "CHILLI: peer %d error in encrypt update",
-           _options.peerid);
-  } else {
-    datalen += olen;
-    if (EVP_EncryptFinal (&ctx, outbuf + olen, &tlen) != 1) {
-      syslog(LOG_ERR, "CHILLI: peer %d error in encrypt final",
-             _options.peerid);
-    } else {
-      datalen += tlen;
-
-      syslog(LOG_DEBUG, "%s(%d): CHILLI: peer %d sending %d bytes", __FUNCTION__, __LINE__,
-             _options.peerid, datalen);
-
-      ret = dhcp_send(dhcp, -1, bmac, packet,
-		      sizeofeth(packet) + datalen);
-    }
-  }
-
-  EVP_CIPHER_CTX_cleanup(&ctx);
-
-  return ret;
-}
-#endif
-
 #ifdef ENABLE_GARDENACCOUNTING
 static int other_data(struct dhcp_conn_t *conn,
 		      struct pkt_iphdr_t *iph, int len, int dst ) {
@@ -266,20 +121,8 @@ struct app_conn_t *
 dhcp_get_appconn_pkt(struct dhcp_conn_t *conn,
 		     struct pkt_iphdr_t *iph,
 		     char is_dst) {
-#ifdef ENABLE_LAYER3
-  switch (conn->authstate) {
-    case DHCP_AUTH_ROUTER:
-      {
-        struct in_addr dst;
-
-        dst.s_addr = ((is_dst) ?
-                      iph->daddr :
-                      iph->saddr);
-
-        return dhcp_get_appconn_ip(conn, &dst);
-      }
-  }
-#endif
+  (void)iph;
+  (void)is_dst;
 
   /* log_dbg("Layer2 appconn"); */
   return (struct app_conn_t *) conn ? conn->peer : 0;
@@ -288,12 +131,7 @@ dhcp_get_appconn_pkt(struct dhcp_conn_t *conn,
 #ifdef ENABLE_UAMANYIP
 static struct app_conn_t *
 dhcp_get_appconn_addr(struct dhcp_conn_t *conn, struct in_addr *dst) {
-#ifdef ENABLE_LAYER3
-  switch (conn->authstate) {
-    case DHCP_AUTH_ROUTER:
-      return dhcp_get_appconn_ip(conn, dst);
-  }
-#endif
+  (void)dst;
 
   /*log_dbg("Layer2 appconn");*/
 
@@ -761,17 +599,9 @@ int dhcp_newconn(struct dhcp_t *this,
 
   dhcp_hashadd(this, *conn);
 
-#ifdef ENABLE_LAYER3
-  if (_options.layer3) {
-    (*conn)->authstate = DHCP_AUTH_ROUTER;
-    (*conn)->dns1.s_addr = _options.dns1.s_addr;
-    (*conn)->dns2.s_addr = _options.dns2.s_addr;
-  }
-  else
-#endif
-    /* Inform application that connection was created */
-    if (this->cb_connect)
-      this->cb_connect(*conn);
+  /* Inform application that connection was created */
+  if (this->cb_connect)
+    this->cb_connect(*conn);
 
   return 0; /* Success */
 }
@@ -2317,11 +2147,7 @@ int dhcp_dnsDNAT(struct dhcp_conn_t *conn,
 #endif
       if (this->anydns) {
 
-        if (
-#ifdef ENABLE_LAYER3
-                ! _options.layer3 &&
-#endif
-                iph->daddr != conn->dns1.s_addr &&
+        if (iph->daddr != conn->dns1.s_addr &&
                 iph->daddr != conn->dns2.s_addr) {
           conn->dnatdns = iph->daddr;
           iph->daddr = conn->dns1.s_addr;
@@ -2587,28 +2413,6 @@ int dhcp_garden_check(struct dhcp_t *this,
       _options.ipwhitelist &&
       dhcp_ipwhitelist(ipph, dst))
     found = 1;
-#endif
-
-#ifdef ENABLE_LAYER3
-  if (!found && _options.ipsrc_num_pass_throughs) {
-#if(_debug_ > 1)
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): Checking ipsrcallowed pass throughs (%d)", __FUNCTION__, __LINE__, _options.ipsrc_num_pass_throughs);
-#endif
-    if (garden_check(_options.ipsrc_pass_throughs,
-                     &_options.ipsrc_num_pass_throughs, &pt,
-                     ipph, !dst
-#ifdef HAVE_PATRICIA
-                     , 0
-#endif
-                     )) {
-      found = 1;
-#if(_debug_ > 1)
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): Packet matches ipsrcallowed", __FUNCTION__, __LINE__);
-#endif
-    }
-  }
 #endif
 
 #ifdef ENABLE_GARDENACCOUNTING
@@ -3775,9 +3579,6 @@ int dhcp_receive_ip(struct dhcp_ctx *ctx, uint8_t *pack, size_t len) {
 #ifdef ENABLE_UAMANYIP
 	&& !_options.uamanyip
 #endif
-#ifdef ENABLE_LAYER3
-	&& !_options.layer3
-#endif
 	) {
       if (_options.debug)
         syslog(LOG_DEBUG, "%s(%d): dropping packet; no dynamic ip and no anyip", __FUNCTION__, __LINE__);
@@ -3944,11 +3745,7 @@ int dhcp_receive_ip(struct dhcp_ctx *ctx, uint8_t *pack, size_t len) {
 	      (pack_iph->daddr == ourip.s_addr)) &&
 	     (pack_udph && (pack_udph->dst == htons(DHCP_BOOTPS))));
 
-  if (is_dhcp
-#ifdef ENABLE_LAYER3
-      && !_options.layer3
-#endif
-      ) {
+  if (is_dhcp) {
     if (_options.debug)
       syslog(LOG_DEBUG, "%s(%d): dhcp/bootps request being processed", __FUNCTION__, __LINE__);
     (void) dhcp_getreq(ctx, pack, len);
@@ -3956,76 +3753,8 @@ int dhcp_receive_ip(struct dhcp_ctx *ctx, uint8_t *pack, size_t len) {
     return 0;
   }
 
-
-#ifdef ENABLE_LAYER3
-  if (is_dhcp && _options.layer3) {
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): forwarding layer2 dhcp/bootps request", __FUNCTION__, __LINE__);
-
-    if (this->relayfd > 0) {
-      /** Relay the DHCP request **/
-      return dhcp_relay(this, pack, len);
-    }
-
-    (void) dhcp_handler(CHILLI_DHCP_PROXY,
-			0, pack, len, 0, 0);
-
-    this->cb_data_ind(conn, pack, len);
-    OTHER_RECEIVED(conn, pack_iph);
-    return 0;
-  }
-#endif
-
-#ifdef ENABLE_LAYER3
-  /*
-   *  A bit of a hack to decouple the one-to-one relationship
-   *  of "dhcp connections" and "app connections". Look for the
-   *  app session based on IP (Layer3) and adjust authstate.
-   */
-  switch (conn->authstate) {
-    case DHCP_AUTH_ROUTER:
-      {
-        struct in_addr src;
-
-        src.s_addr = pack_iph->saddr;
-
-        appconn = chilli_connect_layer3(&src, conn);
-
-        if (!appconn) return -1;
-
-        app_conn_set_idx(appconn, conn);
-
-        if (!appconn->dnlink)
-          appconn->dnlink = conn;
-
-        switch (appconn->s_state.authenticated) {
-          case 1:
-            authstate = DHCP_AUTH_PASS;
-            break;
-          default:
-            authstate = DHCP_AUTH_DNAT;
-            break;
-        }
-
-#ifdef ENABLE_UAMANYIP
-        if (chilli_assign_snat(appconn, 0) != 0) {
-          return -1;
-        }
-#endif
-
-        has_ip = 1;
-      }
-      break;
-
-    default:
-      has_ip = conn->hisip.s_addr != 0;
-      authstate = conn->authstate;
-      break;
-  }
-#else
   has_ip = conn->hisip.s_addr != 0;
   authstate = conn->authstate;
-#endif
 
   /* Request an IP address
      if (_options.uamanyip &&
@@ -4065,11 +3794,7 @@ int dhcp_receive_ip(struct dhcp_ctx *ctx, uint8_t *pack, size_t len) {
 
   conn->lasttime = mainclock_now();
 
-  if (
-#ifdef ENABLE_LAYER3
-          !_options.layer3 &&
-#endif
-          pack_iph->saddr != conn->hisip.s_addr) {
+  if (pack_iph->saddr != conn->hisip.s_addr) {
     if (_options.debug)
       syslog(LOG_DEBUG, "%s(%d): Received packet with spoofed source!", __FUNCTION__, __LINE__);
     OTHER_RECEIVED(conn, pack_iph);
@@ -5077,157 +4802,6 @@ int dhcp_pppoed(struct dhcp_ctx *ctx, uint8_t *packet, size_t length) {
 }
 #endif
 
-#ifdef ENABLE_CLUSTER
-#ifndef HAVE_OPENSSL
-#error Clustiner requires OpenSSL support currently
-#endif
-static
-void update_peer(struct pkt_chillihdr_t *chillihdr) {
-  struct chilli_peer *p = get_chilli_peer(chillihdr->from);
-  p->last_update = mainclock_now();
-  memcpy(&p->addr, &chillihdr->addr, sizeof(struct in_addr));
-  memcpy(p->mac, chillihdr->mac, PKT_ETH_ALEN);
-  p->state = chillihdr->state;
-  if (p->state == PEER_STATE_ACTIVE) {
-    get_chilli_peer(-1)->state = PEER_STATE_STANDBY;
-  }
-}
-
-static
-int dhcp_chillipkt(struct dhcp_ctx *ctx, uint8_t *packet, size_t length) {
-#ifdef HAVE_OPENSSL
-  EVP_CIPHER_CTX cctx;
-
-  unsigned char iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
-
-  struct pkt_ethhdr_t *ethh = pkt_ethhdr(packet);
-
-  unsigned char *in = (unsigned char *)chilli_ethhdr(packet);
-  unsigned char out[1500];
-
-  int n = length - sizeofeth(packet);
-
-  int olen = 0;
-  int tlen = 0;
-
-  if (_options.peerkey == 0)
-    _options.peerkey = "hello!";
-
-  if (_options.debug)
-    syslog(LOG_DEBUG, "%s(%d): CHILLI: peer %d decrypting %d bytes", __FUNCTION__, __LINE__,
-           _options.peerid, n);
-
-  EVP_CIPHER_CTX_init(&cctx);
-  EVP_DecryptInit(&cctx, EVP_bf_cbc(),
-		  (const unsigned char *)_options.peerkey, iv);
-
-  if (EVP_DecryptUpdate(&cctx, out, &olen, in, n) != 1) {
-    syslog(LOG_ERR, "%d CHILLI: peer %d error in decrypt update",
-           errno, _options.peerid);
-  } else {
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): CHILLI: peer %d decrypted %d bytes", __FUNCTION__, __LINE__,
-             _options.peerid, olen);
-    if (EVP_DecryptFinal(&cctx, out + olen, &tlen) != 1) {
-      syslog(LOG_ERR, "%d CHILLI: peer %d error in decrypt final",
-             errno, _options.peerid);
-    } else {
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): CHILLI: peer %d decrypted %d bytes", __FUNCTION__, __LINE__,
-               _options.peerid, tlen);
-
-      olen += tlen;
-
-      if (olen > sizeof(struct pkt_chillihdr_t)) {
-
-	struct pkt_chillihdr_t *chilli_hdr =
-            (struct pkt_chillihdr_t *)out;
-
-	char *cmd = "Unknown";
-
-	switch(chilli_hdr->type) {
-          case CHILLI_PEER_CMD:
-            cmd = "Cmd";
-            if (olen == sizeof(struct pkt_chillihdr_t) +
-                sizeof(CMDSOCK_REQUEST)) {
-              CMDSOCK_REQUEST * req =
-                  (CMDSOCK_REQUEST *)(out + sizeof(struct pkt_chillihdr_t));
-              bstring s = bfromcstr("");
-              chilli_cmd(req, s, 0);
-              bdestroy(s);
-            }
-            break;
-
-          case CHILLI_PEER_INIT:
-            cmd = "Init";
-            if (chilli_hdr->from == _options.peerid) {
-              syslog(LOG_ERR, "peer %d possible conflicting peerid, oops",
-                     _options.peerid);
-            } else {
-              dhcp_sendCHILLI(CHILLI_PEER_HELLO, 0, 0);
-              update_peer(chilli_hdr);
-            }
-            break;
-
-          case CHILLI_PEER_HELLO:
-            cmd = "Hello";
-            if (chilli_hdr->from == _options.peerid) {
-              syslog(LOG_ERR, "peer %d possible conflicting peerid",
-                     _options.peerid);
-            } else {
-              update_peer(chilli_hdr);
-            }
-            break;
-	}
-
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): CHILLI: peer %d received %s from "
-                 MAC_FMT" peerid %d len=%d", __FUNCTION__, __LINE__,
-                 _options.peerid, cmd,
-                 MAC_ARG(ethh->src),
-                 chilli_hdr->from, olen);
-      }
-    }
-  }
-
-  EVP_CIPHER_CTX_cleanup(&cctx);
-
-#else
-#warning Cluster feature requires OpenSSL
-#endif
-  return 0;
-}
-
-static
-char dhcp_ignore(uint16_t prot, uint8_t *packet, size_t length) {
-  struct pkt_ethhdr_t *ethh = pkt_ethhdr(packet);
-  char ignore = 0;
-
-  ignore = get_chilli_peer(-1)->state != PEER_STATE_ACTIVE;
-
-  if (ignore && _options.debug)
-    syslog(LOG_DEBUG, "%s(%d): ignore: src="MAC_FMT" "
-           "dst="MAC_FMT" prot=%.4x %d len=%d", __FUNCTION__, __LINE__,
-           MAC_ARG(ethh->src),
-           MAC_ARG(ethh->dst),
-           prot, (int)prot, length);
-
-  return ignore;
-}
-
-static time_t last_peer_update = 0;
-static time_t peer_update_time = 10;
-void dhcp_peer_update(char force) {
-  struct chilli_peer *me = get_chilli_peer(-1);
-  time_t now = mainclock_now();
-  if (force || now > (last_peer_update + peer_update_time)) {
-    dhcp_sendCHILLI(CHILLI_PEER_HELLO, 0, 0);
-    last_peer_update = now;
-    me->last_update = now;
-  }
-}
-#endif
-
 static
 int dhcp_decaps_cb(void *pctx, struct pkt_buffer *pb) {
   struct dhcp_ctx *ctx = (struct dhcp_ctx *)pctx;
@@ -5279,10 +4853,6 @@ int dhcp_decaps_cb(void *pctx, struct pkt_buffer *pb) {
   }
 #endif
 
-#ifdef ENABLE_CLUSTER
-  ignore = dhcp_ignore(prot, packet, length);
-#endif
-
   if (prot < 1518) {
 #ifdef ENABLE_IEEE8023
     if (!ignore) {
@@ -5310,9 +4880,6 @@ int dhcp_decaps_cb(void *pctx, struct pkt_buffer *pb) {
 #endif
 
 #if(0)
-#ifdef ENABLE_LAYER3
-    if (!_options.layer3)
-#endif
       syslog(LOG_DEBUG, "%s(%d): Layer2 PROT: 0x%.4x dropped", __FUNCTION__, __LINE__, prot);
 #endif
 
@@ -5354,11 +4921,6 @@ int dhcp_decaps_cb(void *pctx, struct pkt_buffer *pb) {
       break;
 #endif
 
-#ifdef ENABLE_CLUSTER
-    case PKT_ETH_PROTO_CHILLI:
-      return dhcp_chillipkt(ctx, packet, length);
-#endif
-
 #ifdef ENABLE_IPV6
     case PKT_ETH_PROTO_IPv6:
       if (_options.ipv6)
@@ -5369,11 +4931,8 @@ int dhcp_decaps_cb(void *pctx, struct pkt_buffer *pb) {
     case PKT_ETH_PROTO_IPX:
     default:
       if (!ignore)
-#ifdef ENABLE_LAYER3
-        if (!_options.layer3)
-#endif
-          if (_options.debug)
-            syslog(LOG_DEBUG, "%s(%d): Layer2 PROT: 0x%.4x dropped", __FUNCTION__, __LINE__, prot);
+        if (_options.debug)
+          syslog(LOG_DEBUG, "%s(%d): Layer2 PROT: 0x%.4x dropped", __FUNCTION__, __LINE__, prot);
       break;
   }
 
@@ -5654,40 +5213,7 @@ int dhcp_data_req(struct dhcp_conn_t *conn,
     return 0;
   }
 
-#ifdef ENABLE_LAYER3
-  /*
-   *  A bit of a hack to decouple the one-to-one relationship
-   *  of "dhcp connections" and "app connections". Look for the
-   *  app session based on IP (Layer3) and adjust authstate.
-   */
-  switch (conn->authstate) {
-    case DHCP_AUTH_ROUTER:
-      {
-        struct app_conn_t *appconn =
-            dhcp_get_appconn_pkt(conn, pkt_iphdr(packet), 1);
-
-        if (!appconn) {
-          return 0;
-        }
-
-        switch (appconn->s_state.authenticated) {
-          case 1:
-            authstate = DHCP_AUTH_PASS;
-            break;
-          default:
-            authstate = DHCP_AUTH_DNAT;
-            break;
-        }
-      }
-      break;
-
-    default:
-      authstate = conn->authstate;
-      break;
-  }
-#else
   authstate = conn->authstate;
-#endif
 
   dhcp_ethhdr(conn, packet, conn->hismac, dhcp_nexthop(this), PKT_ETH_PROTO_IP);
 
@@ -5885,34 +5411,6 @@ int dhcp_receive_arp(struct dhcp_ctx *ctx, uint8_t *pack, size_t len) {
 
   /* get target IP address */
   memcpy(&taraddr.s_addr, &pack_arp->tpa, PKT_IP_ALEN);
-
-#ifdef ENABLE_LAYER3
-  if (_options.layer3) {
-    if (taraddr.s_addr == _options.dhcplisten.s_addr) {
-      if (dhcp_hashget(this, &conn, pack_arp->sha)) {
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): ARP: Address not found: %s", __FUNCTION__, __LINE__, inet_ntoa(reqaddr));
-	if (dhcp_newconn(this, &conn, pack_arp->sha)) {
-	  syslog(LOG_WARNING, "ARP: out of connections");
-	  return 0; /* Out of connections */
-	}
-      }
-      dhcp_conn_set_idx(conn, ctx);
-      dhcp_sendARP(conn, pack, len);
-#ifdef ENABLE_IEEE8021Q
-      if (_options.ieee8021q) {
-#if(_debug_ > 1)
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): calling dhcp_checktag", __FUNCTION__, __LINE__);
-#endif
-	dhcp_checktag(conn, pack);
-      }
-#endif
-    }
-    OTHER_RECEIVED_LEN(conn, len-PKT_ETH_HLEN);
-    return 0;
-  }
-#endif
 
   /* Check to see if we know MAC address. */
   if (dhcp_hashget(this, &conn, pack_arp->sha)) {

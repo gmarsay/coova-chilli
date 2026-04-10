@@ -55,10 +55,6 @@ static cmd_info commands[] = {
   { CMDSOCK_ROUTE,         "route",         NULL },
   { CMDSOCK_ROUTE_GW,      "routegw",       NULL },
 #endif
-#ifdef ENABLE_CLUSTER
-  { CMDSOCK_PEERS,         "peers",         NULL },
-  { CMDSOCK_PEER_SET,      "peerset",       NULL },
-#endif
 #ifdef ENABLE_STATFILE
   { CMDSOCK_STATUSFILE,    "statusfile",    NULL },
 #endif
@@ -166,14 +162,6 @@ static struct cmd_arguments args[] = {
     &request.d.sess.params.url,
     "Set splash page",
     &request.d.sess.params.flags, REQUIRE_UAM_SPLASH },
-#ifdef ENABLE_REDIRINJECT
-  { "inject",
-    CMDSOCK_FIELD_STRING,
-    sizeof(request.d.sess.params.url),
-    &request.d.sess.params.url,
-    "Inject url flag",
-    &request.d.sess.params.flags, UAM_INJECT_URL | REQUIRE_UAM_AUTH },
-#endif
   { "url",
     CMDSOCK_FIELD_STRING,
     sizeof(request.d.sess.params.url),
@@ -418,9 +406,6 @@ int main(int argc, char **argv) {
 
   struct itimerval itval;
 
-#ifdef ENABLE_CLUSTER
-  int peerid = -1;
-#endif
   char *query_timeout_env = NULL;
   int query_timeout = QUERY_TIMEOUT;
 
@@ -455,12 +440,6 @@ int main(int argc, char **argv) {
       argidx++;
       if (argidx >= argc) return usage(argv[0]);
       cmdsock = argv[argidx++];
-#ifdef ENABLE_CLUSTER
-    } else if (!strcmp(argv[argidx], "-p")) {
-      argidx++;
-      if (argidx >= argc) return usage(argv[0]);
-      peerid = atoi(argv[argidx++]);
-#endif
     } else if (!strcmp(argv[argidx], "-json")) {
       request.options |= CMDSOCK_OPT_JSON;
       argidx++;
@@ -566,35 +545,6 @@ int main(int argc, char **argv) {
     fprintf(stderr,"unknown command: %s\n",cmd);
     exit(1);
   }
-
-#ifdef ENABLE_CLUSTER
-  if (peerid > -1) {
-
-    struct sockaddr_in s;
-    int blen = sizeof(struct pkt_chillihdr_t);
-    uint8_t b[blen];
-
-    int fd = socket(AF_INET, SOCK_DGRAM, 0);
-
-    printf("blen %d\n", blen);
-
-    if (fd < 0) {
-      syslog(LOG_ERR, "%s: socket() failed", strerror(errno));
-      exit(1);
-    }
-
-    memset(&s, 0, sizeof(struct sockaddr_in));
-    s.sin_family = AF_INET;
-    s.sin_port = htons(10203);
-    s.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-
-    (void) safe_sendto(fd, b, blen, 0,
-		       (struct sockaddr *)&s,
-		       sizeof(struct sockaddr_in));
-
-    return 0;
-  }
-#endif
 
   if (cmdsockport) {
     struct sockaddr_in remote_port;

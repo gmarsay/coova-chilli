@@ -786,10 +786,6 @@ int runscript(struct app_conn_t *appconn, char* script,
     return 0;
   }
 
-#ifdef ENABLE_LAYER3
-  if (_options.layer3)
-    set_env("LAYER3", VAL_STRING, "1", 0);
-#endif
   set_env("DEV", VAL_STRING, tun(tun, 0).devname, 0);
   set_env("NET", VAL_IN_ADDR, &appconn->net, 0);
   set_env("MASK", VAL_IN_ADDR, &appconn->mask, 0);
@@ -1056,9 +1052,6 @@ static int dnprot_terminate(struct app_conn_t *appconn) {
     kmod_coova_update(appconn);
   }
 #endif
-#ifdef ENABLE_LAYER3
-  if (!_options.layer3)
-#endif
     switch (appconn->dnprot) {
       case DNPROT_WPA:
 #ifdef ENABLE_EAPOL
@@ -1074,10 +1067,6 @@ static int dnprot_terminate(struct app_conn_t *appconn) {
         if (appconn->dnlink)
           ((struct dhcp_conn_t*) appconn->dnlink)->authstate = DHCP_AUTH_DNAT;
         break;
-#ifdef ENABLE_LAYER3
-      case DNPROT_LAYER3:
-        break;
-#endif
       default:
         syslog(LOG_ERR, "Unknown downlink protocol");
         break;
@@ -1208,11 +1197,7 @@ static int checkconn(void) {
 
   for (conn = firstusedconn; conn; conn=conn->next) {
     if (conn->inuse != 0) {
-      if (
-#ifdef ENABLE_LAYER3
-              !_options.layer3 &&
-#endif
-              !(dhcpconn = (struct dhcp_conn_t *)conn->dnlink)) {
+      if (!(dhcpconn = (struct dhcp_conn_t *)conn->dnlink)) {
 	syslog(LOG_WARNING, "No downlink protocol");
 	continue;
       }
@@ -2159,9 +2144,6 @@ int dnprot_reject(struct app_conn_t *appconn) {
       return 0;
 
     case DNPROT_NULL:
-#ifdef ENABLE_LAYER3
-    case DNPROT_LAYER3:
-#endif
       return 0;
 
     default:
@@ -2192,9 +2174,6 @@ int static dnprot_challenge(struct app_conn_t *appconn) {
     case DNPROT_NULL:
     case DNPROT_UAM:
     case DNPROT_MAC:
-#ifdef ENABLE_LAYER3
-    case DNPROT_LAYER3:
-#endif
       break;
 
 #ifdef ENABLE_RADPROXY
@@ -2307,11 +2286,6 @@ int dnprot_accept(struct app_conn_t *appconn) {
     case DNPROT_DHCP_NONE:
       return 0;
 
-#ifdef ENABLE_LAYER3
-    case DNPROT_LAYER3:
-      break;
-#endif
-
     default:
       syslog(LOG_ERR, "Unknown downlink protocol");
       return 0;
@@ -2421,78 +2395,6 @@ static int fwd_ssdp(struct in_addr *dst,
   return 0; /* no match */
 }
 #endif
-
-#ifdef ENABLE_LAYER3
-static int fwd_layer3(struct app_conn_t *appconn,
-		      struct in_addr *dst,
-		      struct pkt_udphdr_t *udph,
-		      struct pkt_buffer *pb,
-		      int ethhdr) {
-  if (udph && udph->src == htons(DHCP_BOOTPS)) {
-    struct dhcp_packet_t *pdhcp =
-        (struct dhcp_packet_t *)(((void *)udph) + PKT_UDP_HLEN);
-
-    if (pdhcp && pdhcp->op == DHCP_BOOTREPLY &&
-	pdhcp->options[0] == 0x63 &&
-	pdhcp->options[1] == 0x82 &&
-	pdhcp->options[2] == 0x53 &&
-	pdhcp->options[3] == 0x63) {
-
-      if (!appconn) {
-	struct in_addr src;
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): Detecting layer3 IP assignment", __FUNCTION__, __LINE__);
-
-	src.s_addr = pdhcp->yiaddr;
-	appconn = chilli_connect_layer3(&src, 0);
-	if (!appconn) {
-	  syslog(LOG_ERR, "could not allocate for %s", inet_ntoa(src));
-	  return 1;
-	}
-      }
-
-#ifdef ENABLE_TAP
-      if (_options.usetap) {
-	struct pkt_ethhdr_t *ethh = pkt_ethhdr(pkt_buffer_head(pb));
-
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): forwarding layer3 dhcp-broadcast: %s",__FUNCTION__, __LINE__, inet_ntoa(*dst));
-
-	dhcp_send(dhcp, -1, ethh->dst,
-		  pkt_buffer_head(pb),
-		  pkt_buffer_length(pb));
-      } else
-#endif
-      {
-	struct pkt_ethhdr_t *ethh;
-	uint8_t packet[PKT_MAX_LEN];
-	size_t length = pkt_buffer_length(pb);
-	size_t hdrlen = PKT_ETH_HLEN;
-
-	memset(packet, 0, hdrlen);
-
-	ethh = pkt_ethhdr(packet);
-
-	uint8_t *dstmac = pdhcp->chaddr;
-
-	memcpy(packet + hdrlen,
-	       pkt_buffer_head(pb),
-	       pkt_buffer_length(pb));
-	length += hdrlen;
-
-	copy_mac6(ethh->dst, dstmac);
-	copy_mac6(ethh->src, dhcp_nexthop(dhcp));
-	ethh->prot = htons(PKT_ETH_PROTO_IP);
-
-	dhcp_send(dhcp, -1, dstmac, packet, length);
-      }
-      return 1;
-    }
-  }
-  return 0;
-}
-#endif
-
 
 /*
  * Tun callbacks
@@ -2719,12 +2621,6 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
     if (fwd_ssdp(&dst, ipph, udph, pb, ethhdr)) return 0;
 #endif
 
-#ifdef ENABLE_LAYER3
-    if (_options.layer3)
-      if (fwd_layer3(0, &dst, udph, pb, ethhdr))
-	return 0;
-#endif
-
     if (_options.debug)
       syslog(LOG_DEBUG, "%s(%d): dropping packet with unknown destination: %s", __FUNCTION__, __LINE__, inet_ntoa(dst));
 
@@ -2740,12 +2636,6 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
     //log_dbg("window scaling to %d", win);
     pkt_shape_tcpwin((struct pkt_iphdr_t *)ipph, win);
   }
-#endif
-
-#ifdef ENABLE_LAYER3
-  if (_options.layer3 && appconn && !appconn->dnlink)
-    if (fwd_layer3(appconn, &dst, udph, pb, ethhdr))
-      return 0;
 #endif
 
   if (appconn == NULL || appconn->dnlink == NULL) {
@@ -2801,9 +2691,6 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
     case DNPROT_MAC:
 #ifdef ENABLE_EAPOL
     case DNPROT_EAPOL:
-#endif
-#ifdef ENABLE_LAYER3
-    case DNPROT_LAYER3:
 #endif
       dhcp_data_req((struct dhcp_conn_t *)appconn->dnlink, pb, ethhdr);
       break;
@@ -3286,12 +3173,6 @@ int accounting_request(struct radius_packet_t *pack,
        * Look for mac address.
        * If not found allocate new..
        */
-#ifdef ENABLE_LAYER3
-      if (_options.layer3) {
-	syslog(LOG_ERR, "Not supported in layer3 mode");
-	return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-      } else {
-#endif
 	if (dhcp_hashget(dhcp, &dhcpconn, hismac)) {
 	  if (dhcp_newconn(dhcp, &dhcpconn, hismac)) {
 	    syslog(LOG_ERR, "Out of connections");
@@ -3303,9 +3184,6 @@ int accounting_request(struct radius_packet_t *pack,
 	  return radius_resp(radius, &radius_pack, peer, pack->authenticator);
 	}
 	appconn = (struct app_conn_t *)dhcpconn->peer;
-#ifdef ENABLE_LAYER3
-      }
-#endif
     }
     else if (nasipattr && nasportattr) { /* Look for NAS IP / Port */
       if (chilli_getconn(&appconn, 0, nasip, nasport)) {
@@ -3526,12 +3404,6 @@ int access_request(struct radius_packet_t *pack,
      * Look for mac address.
      * If not found allocate new..
      */
-#ifdef ENABLE_LAYER3
-    if (_options.layer3) {
-      syslog(LOG_ERR, "Not supported in layer3 mode");
-      return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-    } else {
-#endif
       if (dhcp_hashget(dhcp, &dhcpconn, hismac)) {
 	if (dhcp_newconn(dhcp, &dhcpconn, hismac)) {
 	  syslog(LOG_ERR, "Out of connections");
@@ -3543,9 +3415,6 @@ int access_request(struct radius_packet_t *pack,
 	return radius_resp(radius, &radius_pack, peer, pack->authenticator);
       }
       appconn = (struct app_conn_t *)dhcpconn->peer;
-#ifdef ENABLE_LAYER3
-    }
-#endif
   }
   else {
     syslog(LOG_ERR, "Framed-IP-Address or Calling-Station-ID required in RADIUS request");
@@ -4069,16 +3938,6 @@ config_radius_session(struct session_params *params,
     memcpy(params->url, attr->v.t, attr->l-2);
     params->url[attr->l-2] = 0;
   }
-
-#ifdef ENABLE_REDIRINJECT
-  if (!radius_getattr(pack, &attr, RADIUS_ATTR_VENDOR_SPECIFIC,
-		      RADIUS_VENDOR_COOVACHILLI,
-		      RADIUS_ATTR_COOVACHILLI_INJECT_URL, 0)) {
-    memcpy(params->url, attr->v.t, attr->l-2);
-    params->url[attr->l-2] = 0;
-    params->flags |= UAM_INJECT_URL | REQUIRE_UAM_AUTH;
-  }
-#endif
 
 #ifdef EX_CONFIG_RADIUS_SESSION
 #include EX_CONFIG_RADIUS_SESSION
@@ -5158,10 +5017,7 @@ int cb_dhcp_request(struct dhcp_conn_t *conn, struct in_addr *addr,
     }
 
     /* if not already authenticated, ensure DNAT authstate */
-#ifdef ENABLE_LAYER3
-    if (!_options.layer3)
-#endif
-      conn->authstate = DHCP_AUTH_DNAT;
+    conn->authstate = DHCP_AUTH_DNAT;
   }
 
   /* If IP was requested before authentication it was UAM */
@@ -5238,47 +5094,6 @@ int cb_dhcp_connect(struct dhcp_conn_t *conn) {
   return 0;
 }
 
-#ifdef ENABLE_LAYER3
-struct app_conn_t * chilli_connect_layer3(struct in_addr *src, struct dhcp_conn_t *conn) {
-  struct app_conn_t *appconn = 0;
-  struct ippoolm_t *ipm = 0;
-
-  if (ippool_getip(ippool, &ipm, src)) {
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): New Layer3 %s", __FUNCTION__, __LINE__, inet_ntoa(*src));
-    if (ippool_newip(ippool, &ipm, src, 1)) {
-      if (ippool_newip(ippool, &ipm, src, 0)) {
-	syslog(LOG_ERR, "Failed to allocate either static or dynamic IP address");
-	return 0;
-      }
-    }
-  }
-
-  if (!ipm) {
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): unknown ip", __FUNCTION__, __LINE__);
-    return 0;
-  }
-
-  if ((appconn = (struct app_conn_t *)ipm->peer) == NULL) {
-    if (chilli_getconn(&appconn, src->s_addr, 0, 0)) {
-      if (chilli_connect(&appconn, conn)) {
-	syslog(LOG_ERR, "chilli_connect()");
-	return 0;
-      }
-    }
-  }
-
-  appconn->s_state.last_up_time = mainclock_now();
-  appconn->hisip.s_addr = src->s_addr;
-  appconn->hismask.s_addr = _options.mask.s_addr;
-  appconn->dnprot = DNPROT_LAYER3;
-  appconn->uplink = ipm;
-  ipm->peer = appconn;
-  return appconn;
-}
-#endif
-
 #ifdef ENABLE_CHILLIQUERY
 static char *state2name(int authstate) {
   switch(authstate) {
@@ -5287,9 +5102,6 @@ static char *state2name(int authstate) {
     case DHCP_AUTH_PASS:   return "pass";
     case DHCP_AUTH_DNAT:   return "dnat";
     case DHCP_AUTH_SPLASH: return "splash";
-#ifdef ENABLE_LAYER3
-    case DHCP_AUTH_ROUTER: return "layer2";
-#endif
     default:               return "unknown";
   }
 }
@@ -5451,11 +5263,7 @@ void chilli_print(bstring s, int listfmt,
   if (!appconn && conn)
     appconn = (struct app_conn_t *)conn->peer;
 
-  if (
-#ifdef ENABLE_LAYER3
-          !_options.layer3 &&
-#endif
-          (!appconn || !appconn->inuse)) {
+  if ((!appconn || !appconn->inuse)) {
 #if(_debug_)
     if (_options.debug)
       syslog(LOG_DEBUG, "%s(%d): Can not print info about unused chilli connection", __FUNCTION__, __LINE__);
@@ -5644,31 +5452,8 @@ int cb_dhcp_data_ind(struct dhcp_conn_t *conn, uint8_t *pack, size_t len) {
 #endif
 
   if (!appconn) {
-#ifdef ENABLE_LAYER3
-    if (_options.layer3) {
-      struct ippoolm_t *ipm = 0;
-      struct in_addr addr;
-
-      addr.s_addr = ipph->saddr;
-
-      if (!addr.s_addr) {
-	return tun_encaps(tun, pack, len, 0);
-      }
-
-      if (ippool_getip(ippool, &ipm, &addr)) {
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): unknown IP address: %s", __FUNCTION__, __LINE__, inet_ntoa(addr));
-	return -1;
-      }
-
-      appconn = ipm->peer;
-    }
-    if (!appconn)
-#endif
-    {
-      syslog(LOG_ERR, "No peer protocol defined");
-      return -1;
-    }
+    syslog(LOG_ERR, "No peer protocol defined");
+    return -1;
   }
 
   switch (appconn->dnprot) {
@@ -5683,9 +5468,6 @@ int cb_dhcp_data_ind(struct dhcp_conn_t *conn, uint8_t *pack, size_t len) {
     case DNPROT_MAC:
 #ifdef ENABLE_EAPOL
     case DNPROT_EAPOL:
-#endif
-#ifdef ENABLE_LAYER3
-    case DNPROT_LAYER3:
 #endif
       break;
 
@@ -6155,10 +5937,7 @@ int static uam_msg(struct redir_msg_t *msg) {
       appconn->uamabort = 0;
       appconn->s_state.uamtime = mainclock.tv_sec;
 
-#ifdef ENABLE_LAYER3
-      if (!_options.layer3)
-#endif
-        dhcpconn->authstate = DHCP_AUTH_DNAT;
+      dhcpconn->authstate = DHCP_AUTH_DNAT;
 
       break;
 
@@ -6169,10 +5948,7 @@ int static uam_msg(struct redir_msg_t *msg) {
       appconn->uamabort = 1; /* Next login will be aborted */
       appconn->s_state.uamtime = 0;  /* Force generation of new challenge */
 
-#ifdef ENABLE_LAYER3
-      if (!_options.layer3)
-#endif
-        dhcpconn->authstate = DHCP_AUTH_DNAT;
+      dhcpconn->authstate = DHCP_AUTH_DNAT;
 
       terminate_appconn(appconn, RADIUS_TERMINATE_CAUSE_USER_REQUEST);
 
@@ -6195,7 +5971,7 @@ int static uam_msg(struct redir_msg_t *msg) {
   return 0;
 }
 
-#if defined(ENABLE_CHILLIQUERY) || defined(ENABLE_CLUSTER)
+#ifdef ENABLE_CHILLIQUERY
 static struct app_conn_t * find_app_conn(struct cmdsock_request *req,
                                          int *has_criteria) {
   struct app_conn_t *appconn = 0;
@@ -6206,22 +5982,15 @@ static struct app_conn_t * find_app_conn(struct cmdsock_request *req,
     if (has_criteria)
       *has_criteria = 1;
   } else {
-#ifdef ENABLE_LAYER3
-    if (!_options.layer3)
-#endif
-      if (req->mac[0]||req->mac[1]||req->mac[2]||
-	  req->mac[3]||req->mac[4]||req->mac[5]) {
-	dhcp_hashget(dhcp, &dhcpconn, req->mac);
-	if (has_criteria)
-	  *has_criteria = 1;
-      }
+    if (req->mac[0]||req->mac[1]||req->mac[2]||
+	req->mac[3]||req->mac[4]||req->mac[5]) {
+      dhcp_hashget(dhcp, &dhcpconn, req->mac);
+      if (has_criteria)
+	*has_criteria = 1;
+    }
   }
 
-  if (!appconn && dhcpconn
-#ifdef ENABLE_LAYER3
-      && !_options.layer3
-#endif
-      )
+  if (!appconn && dhcpconn)
     appconn = (struct app_conn_t *) dhcpconn->peer;
 
   if (!appconn && req->d.sess.sessionid[0] != 0) {
@@ -6271,10 +6040,7 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
         if (req->ip.s_addr)
           appconn = dhcp_get_appconn_ip(0, &req->ip);
         else
-#ifdef ENABLE_LAYER3
-          if (!_options.layer3)
-#endif
-            dhcp_hashget(dhcp, &dhcpconn, req->mac);
+          dhcp_hashget(dhcp, &dhcpconn, req->mac);
 
         if (!appconn && !dhcpconn) {
 
@@ -6297,11 +6063,7 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
           if (!appconn)
             appconn = (struct app_conn_t *) dhcpconn->peer;
 
-          if (!dhcpconn
-#ifdef ENABLE_LAYER3
-              && !_options.layer3
-#endif
-              )
+          if (!dhcpconn)
             dhcpconn = (struct dhcp_conn_t *) appconn->dnlink;
 
           if (_options.swapoctets) {
@@ -6610,8 +6372,6 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
             bcatcstr(tmp, " no-accounting");
           if (appconn->s_params.flags & NO_SCRIPT)
             bcatcstr(tmp, " no-script");
-          if (appconn->s_params.flags & UAM_INJECT_URL)
-            bcatcstr(tmp, " inject");
           if (appconn->s_params.flags & UAM_CLEAR_URL)
             bcatcstr(tmp, " clear-url");
           bcatcstr(tmp, "\n");
@@ -6770,32 +6530,18 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
 
         appconn = find_app_conn(req, &crt);
         if (appconn) {
-#ifdef ENABLE_LAYER3
-          if (!_options.layer3)
-#endif
-            dhcpconn = (struct dhcp_conn_t *)appconn->dnlink;
+          dhcpconn = (struct dhcp_conn_t *)appconn->dnlink;
 
           chilli_print(s, listfmt, appconn, dhcpconn);
 
         } else if (!crt) {
-#ifdef ENABLE_LAYER3
-          if (_options.layer3) {
-            for (appconn = firstusedconn; appconn;
-                 appconn = appconn->next) {
-              chilli_print(s, listfmt, appconn, 0);
+          if (dhcp) {
+            dhcpconn = dhcp->firstusedconn;
+            while (dhcpconn) {
+              chilli_print(s, listfmt, 0, dhcpconn);
+              dhcpconn = dhcpconn->next;
             }
-          } else {
-#endif
-            if (dhcp) {
-              dhcpconn = dhcp->firstusedconn;
-              while (dhcpconn) {
-                chilli_print(s, listfmt, 0, dhcpconn);
-                dhcpconn = dhcpconn->next;
-              }
-            }
-#ifdef ENABLE_LAYER3
           }
-#endif
         }
 
 #ifdef ENABLE_JSON
@@ -6977,17 +6723,6 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
 #ifdef ENABLE_STATFILE
     case CMDSOCK_STATUSFILE:
       printstatus();
-      break;
-#endif
-
-#ifdef ENABLE_CLUSTER
-    case CMDSOCK_PEERS:
-      print_peers(s);
-      break;
-
-    case CMDSOCK_PEER_SET:
-      get_chilli_peer(-1)->state = PEER_STATE_ACTIVE;
-      dhcp_peer_update(1);
       break;
 #endif
 
@@ -7200,25 +6935,6 @@ static inline void macauth_reserved(void) {
     conn = conn->next;
   }
 }
-
-#ifdef ENABLE_LAYER3
-static int session_timeout(void) {
-  struct app_conn_t *conn = firstusedconn;
-
-  while (conn) {
-    struct app_conn_t *check_conn = conn;
-    conn = conn->next;
-    if (mainclock_diff(check_conn->s_state.last_up_time) >
-	_options.lease + _options.leaseplus) {
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): Session timeout: Removing connection", __FUNCTION__, __LINE__);
-      session_disconnect(check_conn, 0, RADIUS_TERMINATE_CAUSE_LOST_CARRIER);
-    }
-  }
-
-  return 0;
-}
-#endif
 
 int chilli_main(int argc, char **argv) {
   select_ctx sctx;
@@ -7772,17 +7488,8 @@ int chilli_main(int argc, char **argv) {
         if (dhcp)
           dhcp_timeout(dhcp);
 
-#ifdef ENABLE_LAYER3
-        if (_options.layer3)
-          session_timeout();
-#endif
-
         checkconn();
         lastSecond = mainclock.tv_sec;
-
-#ifdef ENABLE_CLUSTER
-        dhcp_peer_update(0);
-#endif
       }
 
       if (net_select_prepare(&sctx))

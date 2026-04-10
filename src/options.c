@@ -304,7 +304,6 @@ int options_fromfd(int fd, bstring bt) {
   }
 #endif
   if (!option_s_l(bt, &o.routeif)) return 0;
-  if (!option_s_l(bt, &o.peerkey)) return 0;
 
   if (!option_s_l(bt, &o.captiveportalapi_uri)) return 0;
   if (!option_s_l(bt, &o.captiveportalvenue_info_url)) return 0;
@@ -361,11 +360,6 @@ int options_fromfd(int fd, bstring bt) {
 
   if (!option_s_l(bt, &o.uamaliasname)) return 0;
   if (!option_s_l(bt, &o.uamhostname)) return 0;
-
-#ifdef ENABLE_REDIRINJECT
-  if (!option_s_l(bt, &o.inject)) return 0;
-  if (!option_s_l(bt, &o.inject_ext)) return 0;
-#endif
 
   for (i=0; i < MAX_UAM_DOMAINS; i++) {
     if (!option_s_l(bt, &o.uamdomains[i]))
@@ -505,7 +499,6 @@ int options_save(char *file, bstring bt) {
   }
 #endif
   if (!option_s_s(bt, &o.routeif)) return 0;
-  if (!option_s_s(bt, &o.peerkey)) return 0;
 
   if (!option_s_s(bt, &o.captiveportalapi_uri)) return 0;
   if (!option_s_s(bt, &o.captiveportalvenue_info_url)) return 0;
@@ -562,11 +555,6 @@ int options_save(char *file, bstring bt) {
 
   if (!option_s_s(bt, &o.uamaliasname)) return 0;
   if (!option_s_s(bt, &o.uamhostname)) return 0;
-
-#ifdef ENABLE_REDIRINJECT
-  if (!option_s_s(bt, &o.inject)) return 0;
-  if (!option_s_s(bt, &o.inject_ext)) return 0;
-#endif
 
   for (i = 0; i < MAX_UAM_DOMAINS; i++) {
     if (!option_s_s(bt, &o.uamdomains[i]))
