@@ -19,13 +19,7 @@ config.status: configure
 	dh_testdir
 	CFLAGS="$(CFLAGS)" ./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) \
 	--prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info \
-	--sysconfdir=/etc --localstatedir=/var --enable-largelimits \
-	--enable-proxyvsa --enable-miniportal --enable-chilliredir \
-	--enable-binstatusfile --enable-chilliscript \
-	--enable-chilliradsec --enable-eapol \
-	--enable-modules \
-	--enable-multiroute --enable-extadmvsa --with-openssl --with-poll \
-	--enable-json --enable-libjson
+	--sysconfdir=/etc --localstatedir=/var --with-openssl --with-nfcoova
 
 configure:
 	@test -f configure || ./bootstrap

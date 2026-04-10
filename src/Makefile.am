@@ -12,129 +12,52 @@ chilli.h session.h garden.h radius.h options.h \
 tun.h ippool.h md5.h redir.h dhcp.h iphash.h \
 radius_coovachilli.h ssl.h dns.h net.h \
 pkt.h conn.h lookup.h chilli_limits.h cmdline.h debug.h \
-radius_pkt.h ../bstring/bstrlib.h ../config.h system.h 
+radius_pkt.h ../bstring/bstrlib.h ../config.h system.h \
+cmdsock.h
 
 lib_LTLIBRARIES = libchilli.la
 sbin_PROGRAMS = \
-chilli chilli_response chilli_radconfig chilli_opt 
+chilli chilli_response chilli_radconfig chilli_opt chilli_query
 
 suid_programs =
 
 libchilli_la_SOURCES = \
 chilli.c tun.c ippool.c radius.c md5.c redir.c dhcp.c \
 iphash.c lookup.c system.h util.c options.c statusfile.c conn.c sig.c \
-garden.c dns.c session.c pkt.c chksum.c net.c safe.c
+garden.c dns.c session.c pkt.c chksum.c net.c safe.c \
+sfhash.c cmdsock.c
 
-AM_CFLAGS = -D_GNU_SOURCE -Wall -fno-builtin -fno-strict-aliasing \
-  -fomit-frame-pointer -funroll-loops -pipe -I$(top_builddir)/bstring \
- -DDEFCHILLICONF='"$(sysconfdir)/chilli.conf"'\
- -DDEFPIDFILE='"$(localstatedir)/run/chilli.pid"'\
- -DDEFSTATEDIR='"$(localstatedir)/run"'\
- -DSBINDIR='"$(sbindir)"' 
+if WITH_SSL
+libchilli_la_SOURCES += ssl.c ms_chap.c
+endif
 
 chilli_SOURCES= main.c
 chilli_radconfig_SOURCES = main-radconfig.c 
 chilli_response_SOURCES = main-response.c 
 chilli_query_SOURCES = main-query.c 
-chilli_opt_SOURCES = main-opt.c 
+chilli_opt_SOURCES = main-opt.c cmdline.c
 
-libchilli_la_LIBADD = $(top_builddir)/bstring/libbstring.la 
-LDADD = libchilli.la ${LIBRT} $(top_builddir)/bstring/libbstring.la ${LIBJSON}
-
-if WITH_MINICONFIG
-chilli_opt_SOURCES += cmdline.mini.c
-else
-chilli_opt_SOURCES += cmdline.c 
-endif
-
-if WITH_PATRICIA
-libchilli_la_SOURCES += patricia.c patricia.h
-endif
-
-if WITH_JSONLIB
-AM_CFLAGS += -I$(top_builddir)/json
-libchilli_la_LIBADD += $(top_builddir)/json/libjson.la 
-LDADD += $(top_builddir)/json/libjson.la 
-endif
-
-if WITH_SFHASH
-libchilli_la_SOURCES += sfhash.c
-endif
-
-if WITH_LOOKUP3
-libchilli_la_SOURCES += lookup3.c
-endif
+libchilli_la_LIBADD = $(top_builddir)/bstring/libbstring.la \
+	$(top_builddir)/json/libjson.la
 
 if WITH_OPENSSL
 libchilli_la_LIBADD += ${LIBSSL}
+endif
+
+LDADD = libchilli.la ${LIBRT} $(top_builddir)/bstring/libbstring.la ${LIBJSON} \
+	$(top_builddir)/json/libjson.la
+
+if WITH_OPENSSL
 LDADD += ${LIBSSL}
 endif
 
-if WITH_WOLFSSL
-libchilli_la_LIBADD += ${LIBSSL}
-LDADD += ${LIBSSL}
-endif
-
-if WITH_MATRIXSSL
-libchilli_la_SOURCES += mssl.c mssl.h
-libchilli_la_LIBADD += -lmatrixssl
-LDADD += -lmatrixssl
-if WITH_MATRIXSSL_CLI
-SUBDIRS += mssl
-endif
-endif
-
-if WITH_AVL
-libchilli_la_SOURCES += avl/avl.c avl/avl.h avl/list.h \
-avl/common_types.h avl/container_of.h
-endif
-
-if WITH_SSL
-libchilli_la_SOURCES += ssl.c ms_chap.c 
-endif
-
-if WITH_NETFILTER_QUEUE
-libchilli_la_SOURCES += queue.c
-LDADD += ${LIBNETFILTER_QUEUE}
-endif
-
-if WITH_PCAP
-LDADD += ${LIBPCAP}
-endif
-
-if WITH_MULTIROUTE
-sbin_PROGRAMS += chilli_rtmon
-chilli_rtmon_SOURCES = main-rtmon.c 
-libchilli_la_SOURCES += rtmon.c rtmon.h
-endif
-
-if WITH_CHILLIQUERY
-sbin_PROGRAMS += chilli_query
-libchilli_la_SOURCES += cmdsock.c
-chilliinclude_HEADERS += cmdsock.h
-endif
-
-if WITH_CHILLIRADSEC
-sbin_PROGRAMS += chilli_radsec
-chilli_radsec_SOURCES = main-radsec.c 
-chilli_radsec_LDADD = ${LDADD}
-endif
-
-if WITH_CHILLISCRIPT
-sbin_PROGRAMS += chilli_script
-suid_programs += chilli_script
-chilli_script_SOURCES = main-script.c 
-chilli_script_LDADD = ${LDADD}
-endif
-
-if WITH_CHILLIREDIR
-sbin_PROGRAMS += chilli_redir
-chilli_redir_SOURCES = main-redir.c 
-chilli_redir_LDADD = ${LDADD}
-if WITH_CURL
-chilli_redir_LDADD += ${LIBCURL} 
-endif
-endif
+AM_CFLAGS = -D_GNU_SOURCE -Wall -fno-builtin -fno-strict-aliasing \
+  -fomit-frame-pointer -funroll-loops -pipe -I$(top_builddir)/bstring \
+ -I$(top_builddir)/json \
+ -DDEFCHILLICONF='"$(sysconfdir)/chilli.conf"'\
+ -DDEFPIDFILE='"$(localstatedir)/run/chilli.pid"'\
+ -DDEFSTATEDIR='"$(localstatedir)/run"'\
+ -DSBINDIR='"$(sbindir)"' 
 
 if WITH_NETFILTER_COOVA
 SUBDIRS += linux
@@ -143,11 +66,6 @@ endif
 
 if !HAVE_STRLCPY
 libchilli_la_SOURCES += ../extern/strlcpy.c
-endif
-
-CMDLINE = cmdline.ggo
-if WITH_CONFIG
-CMDLINE += `[ -e ../../cmdline.ggo ] && echo ../../cmdline.ggo`
 endif
 
 install-exec-hook:
@@ -160,7 +78,7 @@ install-exec-hook:
 main-opt.c: cmdline.c cmdline.h
 
 cmdline.c cmdline.h: cmdline.ggo cmdline.patch
-	cat $(CMDLINE) | gengetopt -C 
+	cat cmdline.ggo | gengetopt -C 
 	cp cmdline.c cmdline.c.orig
 	patch -p0 < cmdline.patch
 

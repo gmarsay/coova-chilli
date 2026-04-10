@@ -1,7 +1,6 @@
 
 man_MANS = chilli.8 chilli.conf.5 chilli_query.1 chilli_response.1 \
-chilli_radconfig.1 chilli-radius.5 chilli_opt.1 chilli_rtmon.1 \
-chilli_redir.1 chilli_radsec.1 chilli_script.1
+chilli_radconfig.1 chilli-radius.5 chilli_opt.1
 
 man_aux = $(man_MANS:=.in)
 EXTRA_DIST = $(man_aux) \
@@ -35,11 +34,6 @@ chilli_opt.1: Makefile chilli_opt.1.in
 	$(edit) chilli_opt.1.in >chilli_opt.1.tmp
 	mv chilli_opt.1.tmp chilli_opt.1
 
-chilli_rtmon.1: Makefile chilli_rtmon.1.in
-	rm -f chilli_rtmon.1 chilli_rtmon.1.tmp
-	$(edit) chilli_rtmon.1.in >chilli_rtmon.1.tmp
-	mv chilli_rtmon.1.tmp chilli_rtmon.1
-
 chilli_response.1: Makefile chilli_response.1.in
 	rm -f chilli_response.1 chilli_response.1.tmp
 	$(edit) chilli_response.1.in >chilli_response.1.tmp
@@ -55,20 +49,4 @@ chilli_radconfig.1: Makefile chilli_radconfig.1.in
 	rm -f chilli_radconfig.1 chilli_radconfig.1.tmp
 	$(edit) chilli_radconfig.1.in >chilli_radconfig.1.tmp
 	mv chilli_radconfig.1.tmp chilli_radconfig.1
-
-chilli_redir.1: Makefile chilli_redir.1.in
-	rm -f chilli_redir.1 chilli_redir.1.tmp
-	$(edit) chilli_redir.1.in >chilli_redir.1.tmp
-	mv chilli_redir.1.tmp chilli_redir.1
-
-chilli_radsec.1: Makefile chilli_radsec.1.in
-	rm -f chilli_radsec.1 chilli_radsec.1.tmp
-	$(edit) chilli_radsec.1.in >chilli_radsec.1.tmp
-	mv chilli_radsec.1.tmp chilli_radsec.1
-
-chilli_script.1: Makefile chilli_script.1.in
-	rm -f chilli_script.1 chilli_script.1.tmp
-	$(edit) chilli_script.1.in >chilli_script.1.tmp
-	mv chilli_script.1.tmp chilli_script.1
-
 

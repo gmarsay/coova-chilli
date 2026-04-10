@@ -28,15 +28,11 @@ sh bootstrap
 %configure \
         --disable-static \
         --enable-shared \
-	--enable-largelimits \
-	--enable-miniportal \
-	--enable-chilliredir \
-        --enable-chilliscript \
-	--with-poll \
-    --enable-libjson \
+	--with-nfcoova \
 %if %{!?_without_ssl:1}0
 	--with-openssl \
-	--enable-chilliradsec \
+%else
+	--without-openssl \
 %endif
 
 
@@ -80,7 +76,6 @@ fi
 %dir %{_sysconfdir}/chilli
 %dir %{_sysconfdir}/chilli/www
 %attr(755,root,root)%{_sysconfdir}/chilli/www/config.sh
-%attr(4750,root,root)%{_sbindir}/chilli_script
 %{_sysconfdir}/chilli/www/*
 %{_sysconfdir}/chilli/wwwsh
 %{_sysconfdir}/chilli/functions

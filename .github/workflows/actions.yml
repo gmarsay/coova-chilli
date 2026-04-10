@@ -19,12 +19,7 @@ jobs:
       run: ./bootstrap
     - name: Configure
       run: |
-        ./configure --enable-largelimits --enable-proxyvsa --enable-miniportal \
-        --enable-chilliredir --enable-binstatusfile \
-        --enable-chilliscript --enable-chilliradsec --with-avl \
-        --enable-eapol --enable-modules \
-        --enable-multiroute --enable-extadmvsa --with-openssl --with-poll \
-        --enable-json --enable-libjson --prefix=/var/tmp/coova
+        ./configure --prefix=/var/tmp/coova --with-openssl --with-nfcoova
     - name: Build
       run: make
     - name: Install
