@@ -100,10 +100,6 @@ struct app_conn_t {
   struct session_params s_params;         /* Session parameters */
   struct session_state  s_state;          /* Session state */
 
-#ifdef HAVE_PATRICIA
-  patricia_tree_t *ptree;
-#endif
-
   /* Radius authentication stuff */
   /* Parameters are initialised whenever a reply to an access request
      is received. */

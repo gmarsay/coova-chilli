@@ -68,15 +68,19 @@ Show the internal RADIUS queue state.
 
 .TP
 .BI addgarden " [ ip <ip> | mac <mac> ] data <uamallow-resource>"
-Add to the dynamic walled garden. When used without the 'ip' or 'mac'
-option, the entry applies to the global garden. Otherwise, it is
-session specific only if configured with --enable-sessgarden.
+Add to the dynamic walled garden (global). Optional
+.B ip
+and
+.B mac
+arguments are accepted for consistency with other commands but are ignored.
 
 .TP
 .BI remgarden " [ ip <ip> | mac <mac> ] data <uamallow-resource>"
-Remove from the dynamic walled garden. When used without the 'ip'
-or 'mac' option, the entry applies to the global garden. Otherwise, it
-is session specific only if configured with --enable-sessgarden.
+Remove from the dynamic walled garden (global). Optional
+.B ip
+and
+.B mac
+arguments are accepted for consistency with other commands but are ignored.
 
 .RS
 .I PARAMETERS

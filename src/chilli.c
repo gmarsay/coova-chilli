@@ -952,11 +952,6 @@ int static freeconn(struct app_conn_t *conn) {
   }
 #endif
 
-#ifdef WITH_PATRICIA
-  if (conn->ptree)
-    patricia_destroy (conn->ptree, free);
-#endif
-
   /* Remove from link of used */
   if ((conn->next) && (conn->prev)) {
     conn->next->prev = conn->prev;
@@ -3603,11 +3598,6 @@ config_radius_session(struct session_params *params,
     const char *splash = "splash";
     const char *logout = "logout";
 
-#ifdef ENABLE_SESSGARDEN
-    const char *uamallowed = "uamallowed=";
-    const int uamallowed_len = strlen(uamallowed);
-#endif
-
     while (!radius_getnextattr(pack, &attr,
 			       RADIUS_ATTR_VENDOR_SPECIFIC,
 			       RADIUS_VENDOR_COOVACHILLI,
@@ -3627,43 +3617,6 @@ config_radius_session(struct session_params *params,
 	params->flags |= REQUIRE_UAM_SPLASH;
 	/*is_splash = 1;*/
       }
-#ifdef ENABLE_SESSGARDEN
-      else if (len > uamallowed_len && len < 255 &&
-	       !memcmp(val, uamallowed, uamallowed_len)) {
-	char name[256];
-
-	/* copy and null-terminate */
-	len -= uamallowed_len;
-	val += uamallowed_len;
-	memcpy(name, val, len);
-	name[len]=0;
-
-	if (len == 5 && !memcmp(name,"reset",5)) {
-	  params->pass_through_count = 0;
-#ifdef HAVE_PATRICIA
-	  if (appconn && appconn->ptree) {
-	    patricia_destroy (appconn->ptree, free);
-	    appconn->ptree = NULL;
-	  }
-#endif
-	} else {
-
-#ifdef HAVE_PATRICIA
-	  if (appconn && appconn->ptree == NULL)
-	    appconn->ptree = patricia_new (32);
-#endif
-
-	  pass_throughs_from_string(params->pass_throughs,
-				    SESSION_PASS_THROUGH_MAX,
-				    &params->pass_through_count,
-				    name, 0, 0
-#ifdef HAVE_PATRICIA
-				    , appconn ? appconn->ptree : 0
-#endif
-				    );
-	}
-      }
-#endif
       else if (appconn && len >= strlen(logout) &&
 	       !memcmp(val, logout, strlen(logout))) {
 	if (appconn)
@@ -5547,57 +5500,14 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
     case CMDSOCK_REM_GARDEN:
       {
         char remove = (req->type == CMDSOCK_REM_GARDEN);
-#ifdef ENABLE_SESSGARDEN
-        uint8_t z[PKT_ETH_ALEN];
-        memset(z, 0, PKT_ETH_ALEN);
-
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): looking to %s to garden ip=%s/sessionid=%s", __FUNCTION__, __LINE__,
-                 remove ? "remove" : "add", inet_ntoa(req->ip), req->d.sess.sessionid);
-
-        if (req->ip.s_addr || memcmp(req->mac, z, PKT_ETH_ALEN)) {
-          struct app_conn_t *appconn = firstusedconn;
-
-          while (appconn) {
-            if (appconn->inuse &&
-                ( (req->ip.s_addr != 0 && appconn->hisip.s_addr == req->ip.s_addr) ||
-                  (!memcmp(appconn->hismac, req->mac, PKT_ETH_ALEN))
-                  ) ) {
-
-              if (_options.debug)
-                syslog(LOG_DEBUG, "%s(%d): remote %s garden for session %s", __FUNCTION__, __LINE__,
-                       remove ? "rem" : "add", appconn->s_state.sessionid);
-
+        pass_throughs_from_string(dhcp->pass_throughs,
+                                  MAX_PASS_THROUGHS,
+                                  &dhcp->num_pass_throughs,
+                                  req->d.data, 1, remove
 #ifdef HAVE_PATRICIA
-              if (appconn->ptree == NULL)
-                appconn->ptree = patricia_new (32);
+                                  , dhcp->ptree_dyn
 #endif
-
-              pass_throughs_from_string(appconn->s_params.pass_throughs,
-                                        SESSION_PASS_THROUGH_MAX,
-                                        &appconn->s_params.pass_through_count,
-                                        req->d.data, 1, remove
-#ifdef HAVE_PATRICIA
-                                        , appconn->ptree
-#endif
-                                        );
-              break;
-            }
-            appconn = appconn->next;
-          }
-        } else {
-#endif
-          pass_throughs_from_string(dhcp->pass_throughs,
-                                    MAX_PASS_THROUGHS,
-                                    &dhcp->num_pass_throughs,
-                                    req->d.data, 1, remove
-#ifdef HAVE_PATRICIA
-                                    , dhcp->ptree_dyn
-#endif
-                                    );
-#ifdef ENABLE_SESSGARDEN
-        }
-#endif
+                                  );
       }
       break;
 

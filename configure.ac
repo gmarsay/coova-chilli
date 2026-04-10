@@ -275,32 +275,11 @@ if test x"$enable_debug2" = xyes; then
    AC_DEFINE(ENABLE_DEBUG2,1,[Define to enable verbose debugging])
 fi
 
-AC_ARG_ENABLE(sessgarden, [AS_HELP_STRING([--enable-sessgarden],[Enable support for session-based walled garden])], 
-  enable_sessgarden=$enableval, enable_sessgarden=no)
-
-if test x"$enable_sessgarden" = xyes; then
-   AC_DEFINE(ENABLE_SESSGARDEN,1,[Define to enable Chilli session walled garden])
-fi
-
-AC_ARG_ENABLE(sessproxy, [AS_HELP_STRING([--enable-sessproxy],[Enable support for per session postauth proxy])], 
-  enable_sessproxy=$enableval, enable_sessproxy=no)
-
-if test x"$enable_sessproxy" = xyes; then
-   AC_DEFINE(ENABLE_SESSPROXY,1,[Define to enable per session postauth proxy])
-fi
-
 AC_ARG_ENABLE(sessdhcp, [AS_HELP_STRING([--enable-sessdhcp],[Enable support for per session DHCP relay])], 
   enable_sessdhcp=$enableval, enable_sessdhcp=no)
 
 if test x"$enable_sessdhcp" = xyes; then
    AC_DEFINE(ENABLE_SESSDHCP,1,[Define to enable per session DHCP relay])
-fi
-
-AC_ARG_ENABLE(sessdns, [AS_HELP_STRING([--enable-sessdns],[Enable support for per session DNS enforcement])], 
-  enable_sessdns=$enableval, enable_sessdns=no)
-
-if test x"$enable_sessdns" = xyes; then
-   AC_DEFINE(ENABLE_SESSDNS,1,[Define to enable per session DNS enforcement])
 fi
 
 AC_ARG_ENABLE(proxyvsa, [AS_HELP_STRING([--enable-proxyvsa],[Enable support for VSA attribute proxy])], 

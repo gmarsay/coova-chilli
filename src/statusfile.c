@@ -202,13 +202,6 @@ int loadstatus(void) {
 			     &_options.dns1, &_options.dns2);
 	    }
 
-#if defined(ENABLE_SESSGARDEN) && defined(HAVE_PATRICIA)
-	    if (aconn->s_params.pass_through_count) {
-	      garden_patricia_load_list(&aconn->ptree,
-					aconn->s_params.pass_throughs,
-					aconn->s_params.pass_through_count);
-	    }
-#endif
 	  }
 
 	  /* todo: read a md5 checksum or magic token */

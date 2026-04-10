@@ -57,38 +57,6 @@ void garden_print_list(int fd, pass_through *ptlist, int ptcnt) {
   }
 }
 
-#ifdef ENABLE_SESSGARDEN
-int garden_print_appconn(struct app_conn_t *appconn, void *d) {
-  char line[512];
-  int fd = * (int *) d;
-#ifdef HAVE_PATRICIA
-  void cb (prefix_t *prefix, void *data) {
-    struct node_pass_through_list *nd =
-        (struct node_pass_through_list *)data;
-    garden_print_list(fd, nd->ptlist, nd->ptcnt);
-  }
-#endif
-  if (appconn->s_params.pass_through_count > 0) {
-    snprintf(line, sizeof line,
-		  "subscriber %s (%d/%d):\n",
-		  inet_ntoa(appconn->hisip),
-		  appconn->s_params.pass_through_count,
-		  SESSION_PASS_THROUGH_MAX);
-    if (!safe_write(fd, line, strlen(line))) /* error */
-      ;
-#ifdef HAVE_PATRICIA
-    if (appconn->ptree) {
-      patricia_process(appconn->ptree, cb);
-    } else
-#endif
-    garden_print_list(fd,
-			appconn->s_params.pass_throughs,
-			appconn->s_params.pass_through_count);
-  }
-  return 0;
-}
-#endif
-
 void garden_print(int fd) {
   char line[512];
 
@@ -148,10 +116,6 @@ void garden_print(int fd) {
     garden_print_list(fd,
 		      _options.authed_pass_throughs,
 		      _options.num_authed_pass_throughs);
-#endif
-
-#ifdef ENABLE_SESSGARDEN
-  chilli_appconn_run(garden_print_appconn, &fd);
 #endif
 }
 #endif

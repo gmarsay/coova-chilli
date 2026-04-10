@@ -114,7 +114,6 @@
 
 #ifdef ENABLE_LARGELIMITS
 #define PKT_MAX_LEN                    65535 /* Maximum packet size we receive */
-#define SESSION_PASS_THROUGH_MAX          16
 #define MAX_PASS_THROUGHS               1024 /* Max number of allowed UAM pass-throughs */
 #define MAX_REGEX_PASS_THROUGHS          512 /* Max number of allowed UAM pass-throughs */
 #define MAX_UAM_DOMAINS                  128 /* Max number of allowed UAM domains */
@@ -123,7 +122,6 @@
 #define RADIUS_PACKSIZE                 4096
 #else
 #define PKT_MAX_LEN                     9000 /* Maximum packet size we receive */
-#define SESSION_PASS_THROUGH_MAX           8
 #define MAX_PASS_THROUGHS                128 /* Max number of allowed UAM pass-throughs */
 #define MAX_REGEX_PASS_THROUGHS            8 /* Max number of allowed UAM pass-throughs */
 #define MAX_UAM_DOMAINS                   32 /* Max number of allowed UAM domains */

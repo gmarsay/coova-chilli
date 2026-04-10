@@ -2320,53 +2320,6 @@ int dhcp_garden_check(struct dhcp_t *this,
   }
 #endif
 
-#ifdef ENABLE_SESSGARDEN
-  if (!found) {
-    if (!appconn)
-      appconn = dhcp_get_appconn_pkt(conn,
-				     (struct pkt_iphdr_t *)ipph,
-				     !dst);
-    if (appconn) {
-#ifdef HAVE_PATRICIA
-      if (appconn->ptree) {
-
-	if (garden_patricia_check(appconn->ptree,
-				  appconn->s_params.pass_throughs,
-				  &appconn->s_params.pass_through_count,
-				  ipph, dst))
-	  found = 1;
-
-      } else {
-#endif
-	switch (garden_check(appconn->s_params.pass_throughs,
-			     &appconn->s_params.pass_through_count, &pt,
-			     ipph, dst
-#ifdef HAVE_PATRICIA
-			     , 0
-#endif
-			     )) {
-          case 1:
-            found = 1;
-            break;
-#ifdef ENABLE_GARDENEXT
-          case -1:
-            if (pt)
-              pass_through_rem(appconn->s_params.pass_throughs,
-                               &appconn->s_params.pass_through_count, pt
-#ifdef HAVE_PATRICIA
-                               , 0
-#endif
-                               );
-            break;
-#endif
-	}
-#ifdef HAVE_PATRICIA
-      }
-#endif
-    }
-  }
-#endif
-
 #ifdef ENABLE_IPWHITELIST
   if (!found &&
       _options.ipwhitelist &&

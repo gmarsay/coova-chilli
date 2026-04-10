@@ -22,7 +22,6 @@
 #define _SESSION_H
 
 #include "chilli_limits.h"
-#include "garden.h"
 
 struct session_params {
   uint8_t url[REDIR_USERURLSIZE];
@@ -49,22 +48,8 @@ struct session_params {
 #define UAM_CLEAR_URL      (1<<8)
   uint16_t flags;
 
-#ifdef ENABLE_SESSPROXY
-  struct in_addr postauth_proxy;
-  uint16_t postauth_proxyport;
-#endif
-
 #ifdef ENABLE_SESSDHCP
   struct in_addr dhcp_relay;
-#endif
-
-#ifdef ENABLE_SESSDNS
-  struct in_addr dns1;
-#endif
-
-#ifdef ENABLE_SESSGARDEN
-  pass_through pass_throughs[SESSION_PASS_THROUGH_MAX];
-  uint32_t pass_through_count;
 #endif
 } __attribute__((packed));
 

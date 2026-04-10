@@ -147,20 +147,11 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_SESSDHCP
     "ENABLE_SESSDHCP "
 #endif
-#ifdef ENABLE_SESSDNS
-    "ENABLE_SESSDNS "
-#endif
-#ifdef ENABLE_SESSGARDEN
-    "ENABLE_SESSGARDEN "
-#endif
 #ifdef ENABLE_SESSIONID
     "ENABLE_SESSIONID "
 #endif
 #ifdef ENABLE_SESSIONSTATE
     "ENABLE_SESSIONSTATE "
-#endif
-#ifdef ENABLE_SESSPROXY
-    "ENABLE_SESSPROXY "
 #endif
 #ifdef ENABLE_SSDP
     "ENABLE_SSDP "
