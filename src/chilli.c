@@ -3269,7 +3269,6 @@ int cb_radius_ind(struct radius_t *rp, struct radius_packet_t *pack,
       return 0;
   }
 }
-#endif
 
 static int
 session_disconnect(struct app_conn_t *appconn,

@@ -42,20 +42,8 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_DEBUG
     "ENABLE_DEBUG "
 #endif
-#ifdef ENABLE_DEBUG2
-    "ENABLE_DEBUG2 "
-#endif
 #ifdef ENABLE_ACCOUNTING_ONOFF
     "ENABLE_ACCOUNTING_ONOFF "
-#endif
-#ifdef ENABLE_APSESSIONID
-    "ENABLE_APSESSIONID "
-#endif
-#ifdef ENABLE_AUTHEDALLOWED
-    "ENABLE_AUTHEDALLOWED "
-#endif
-#ifdef ENABLE_BINSTATFILE
-    "ENABLE_BINSTATFILE "
 #endif
 #ifdef ENABLE_CHILLIQUERY
     "ENABLE_CHILLIQUERY "
@@ -66,41 +54,14 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_RADPROXY
     "ENABLE_RADPROXY "
 #endif
-#ifdef ENABLE_CHILLIRADSEC
-    "ENABLE_CHILLIRADSEC "
-#endif
-#ifdef ENABLE_CHILLIREDIR
-    "ENABLE_CHILLIREDIR "
-#endif
-#ifdef ENABLE_CHILLISCRIPT
-    "ENABLE_CHILLISCRIPT "
-#endif 
 #ifdef ENABLE_DHCPRADIUS
     "ENABLE_DHCPRADIUS "
-#endif
-#ifdef ENABLE_DHCPOPT
-    "ENABLE_DHCPOPT "
-#endif
-#ifdef ENABLE_EAPOL
-    "ENABLE_EAPOL "
-#endif
-#ifdef ENABLE_FORCEDNS
-    "ENABLE_FORCEDNS "
-#endif
-#ifdef ENABLE_GARDENACCOUNTING
-    "ENABLE_GARDENACCOUNTING "
-#endif
-#ifdef ENABLE_GARDENEXT
-    "ENABLE_GARDENEXT "
 #endif
 #ifdef ENABLE_IEEE8021Q
     "ENABLE_IEEE8021Q "
 #endif
 #ifdef ENABLE_IPV6
     "ENABLE_IPV6 "
-#endif
-#ifdef ENABLE_IPWHITELIST
-    "ENABLE_IPWHITELIST "
 #endif
 #ifdef ENABLE_JSON
     "ENABLE_JSON "
@@ -110,45 +71,6 @@ static const char *compile_options = "Compiled with "
 #endif
 #ifdef ENABLE_LEAKYBUCKET
     "ENABLE_LEAKYBUCKET "
-#endif
-#ifdef ENABLE_MDNS
-    "ENABLE_MDNS "
-#endif
-#ifdef ENABLE_MINICONFIG
-    "ENABLE_MINICONFIG "
-#endif
-#ifdef ENABLE_MINIPORTAL
-    "ENABLE_MINIPORTAL "
-#endif
-#ifdef ENABLE_MULTILAN
-    "ENABLE_MULTILAN "
-#endif
-#ifdef ENABLE_MULTIROUTE
-    "ENABLE_MULTIROUTE "
-#endif
-#ifdef ENABLE_NETBIOS
-    "ENABLE_NETBIOS "
-#endif
-#ifdef ENABLE_PROXYVSA
-    "ENABLE_PROXYVSA "
-#endif
-#ifdef ENABLE_EXTADMVSA
-    "ENABLE_EXTADMVSA "
-#endif
-#ifdef ENABLE_SESSDHCP
-    "ENABLE_SESSDHCP "
-#endif
-#ifdef ENABLE_SESSIONID
-    "ENABLE_SESSIONID "
-#endif
-#ifdef ENABLE_SESSIONSTATE
-    "ENABLE_SESSIONSTATE "
-#endif
-#ifdef ENABLE_SSDP
-    "ENABLE_SSDP "
-#endif
-#ifdef ENABLE_STATFILE
-    "ENABLE_STATFILE "
 #endif
 #ifdef ENABLE_TAP
     "ENABLE_TAP "
@@ -162,32 +84,17 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_UAMUIPORT
     "ENABLE_UAMUIPORT "
 #endif
-#ifdef ENABLE_WPAD
-    "ENABLE_WPAD "
-#endif
-#ifdef HAVE_MATRIXSSL
-    "HAVE_MATRIXSSL "
-#endif
 #ifdef HAVE_NETFILTER_COOVA
     "HAVE_NETFILTER_COOVA "
 #endif
-#ifdef HAVE_NETFILTER_QUEUE
-    "HAVE_NETFILTER_QUEUE "
-#endif
 #ifdef HAVE_OPENSSL
     "HAVE_OPENSSL "
-#endif
-#ifdef USING_CURL
-    "USING_CURL "
 #endif
 #ifdef USING_IPC_MSG
     "USING_IPC_MSG "
 #endif
 #ifdef USING_PCAP
     "USING_PCAP "
-#endif
-#ifdef USING_MMAP
-    "USING_MMAP "
 #endif
 #ifdef USING_POLL
     "USING_POLL "
@@ -323,14 +230,6 @@ int main(int argc, char **argv) {
   _options.mtu = args_info.mtu_arg;
   _options.usetap = args_info.usetap_flag;
   _options.noarpentries = args_info.noarpentries_flag;
-#if(_debug_ && !defined(ENABLE_TAP))
-  if (_options.noarpentries)
-    syslog(LOG_WARNING, "tap not implemented. build with --enable-tap");
-#endif
-#if(_debug_ && !defined(ENABLE_TAP))
-  if (_options.usetap)
-    syslog(LOG_WARNING, "tap not implemented. build with --enable-tap");
-#endif
   _options.foreground = args_info.fg_flag;
   _options.logfacility = args_info.logfacility_arg;
   _options.loglevel = args_info.loglevel_arg;
@@ -339,11 +238,6 @@ int main(int argc, char **argv) {
   _options.leaseplus = args_info.leaseplus_arg;
   _options.dhcpstart = args_info.dhcpstart_arg;
   _options.dhcpend = args_info.dhcpend_arg;
-  _options.eapolenable = args_info.eapolenable_flag;
-#if(_debug_ && !defined(ENABLE_EAPOL))
-  if (_options.eapolenable)
-    syslog(LOG_WARNING, "EAPOL not implemented. build with --enable-eapol");
-#endif
   _options.swapoctets = args_info.swapoctets_flag;
   _options.macauth = args_info.macauth_flag;
   _options.macreauth = args_info.macreauth_flag;
@@ -377,15 +271,7 @@ int main(int argc, char **argv) {
   _options.proxymacaccept = args_info.proxymacaccept_flag;
   _options.proxyonacct = args_info.proxyonacct_flag;
 #endif
-#if(_debug_ && !defined(ENABLE_RADPROXY))
-  if (args_info.proxyport_arg)
-    syslog(LOG_ERR, "radproxy not implemented. build with --enable-radproxy");
-#endif
   _options.txqlen = args_info.txqlen_arg;
-#ifdef USING_MMAP
-  _options.ringsize = args_info.ringsize_arg;
-  _options.mmapring = args_info.mmapring_flag;
-#endif
   _options.sndbuf = args_info.sndbuf_arg;
   _options.rcvbuf = args_info.rcvbuf_arg;
   _options.childmax = args_info.childmax_arg;
@@ -406,23 +292,13 @@ int main(int argc, char **argv) {
   _options.uamdomain_ttl = args_info.uamdomainttl_arg;
   _options.seskeepalive = args_info.seskeepalive_flag;
   _options.uamallowpost = args_info.uamallowpost_flag;
-  _options.redir = args_info.redir_flag;
   _options.redirurl = args_info.redirurl_flag;
   _options.statusfilesave = args_info.statusfilesave_flag;
   _options.dhcpnotidle = args_info.dhcpnotidle_flag;
-#if(_debug_ && !defined(ENABLE_CHILLIREDIR))
-  if (_options.redir)
-    syslog(LOG_ERR, "chilli_redir not implemented. build with --enable-chilliredir");
-#endif
   _options.redirssl = args_info.redirssl_flag;
   _options.uamuissl = args_info.uamuissl_flag;
   _options.domaindnslocal = args_info.domaindnslocal_flag;
   _options.framedservice = args_info.framedservice_flag;
-  _options.radsec = args_info.radsec_flag;
-#if(_debug_ && !defined(ENABLE_CHILLIRADSEC))
-  if (_options.radsec)
-    syslog(LOG_ERR, "chilli_radsec not implemented. build with --enable-chilliradsec");
-#endif
   _options.noradallow = args_info.noradallow_flag;
 
 #ifdef ENABLE_IPV6
@@ -457,38 +333,6 @@ int main(int argc, char **argv) {
   _options.bwbucketminsize = args_info.bwbucketminsize_arg;
 #endif
 
-#ifdef ENABLE_PROXYVSA
-  _options.vlanlocation = args_info.vlanlocation_flag;
-  _options.location_stop_start = args_info.locationstopstart_flag;
-  _options.location_copy_called = args_info.locationcopycalled_flag;
-  _options.location_immediate_update = args_info.locationimmediateupdate_flag;
-  _options.location_option_82 = args_info.locationopt82_flag;
-  if (args_info.proxylocattr_given) {
-    for (numargs = 0; numargs < args_info.proxylocattr_given
-             && numargs < PROXYVSA_ATTR_CNT; ++numargs)  {
-      unsigned int i[2];
-
-      switch (sscanf(args_info.proxylocattr_arg[numargs],
-		     "%u,%u", &i[0], &i[1])) {
-        case 0:
-          syslog(LOG_ERR, "invalid input %s", args_info.proxylocattr_arg[numargs]);
-          break;
-        case 1:
-          _options.proxy_loc[numargs].attr = i[0];
-          break;
-        case 2:
-          _options.proxy_loc[numargs].attr_vsa = i[0];
-          _options.proxy_loc[numargs].attr = i[1];
-          break;
-      }
-
-      syslog(LOG_DEBUG, "Proxy location attr %d %d",
-             (int)_options.proxy_loc[numargs].attr_vsa,
-             (int)_options.proxy_loc[numargs].attr);
-    }
-  }
-#endif
-
   if (args_info.dhcpgateway_arg &&
       !inet_aton(args_info.dhcpgateway_arg, &_options.dhcpgwip)) {
     syslog(LOG_ERR, "Invalid DHCP gateway IP address: %s!", args_info.dhcpgateway_arg);
@@ -504,24 +348,6 @@ int main(int argc, char **argv) {
   }
 
   _options.dhcpif = STRDUP(args_info.dhcpif_arg);
-
-#ifdef ENABLE_MULTILAN
-  for (numargs = 0; numargs < args_info.moreif_given &&
-           numargs < MAX_MOREIF; ++numargs) {
-    char *nif = STRDUP(args_info.moreif_arg[numargs]);
-    char *vln = strchr(nif, '/');
-    _options.moreif[numargs].dhcpif = nif;
-    if (vln) {
-      if (strlen(vln) > 1)
-	_options.moreif[numargs].vlan = vln + 1;
-      *vln = 0;
-    } else {
-      vln = strchr(nif, '.');
-      if (vln && strlen(vln) > 1)
-	_options.moreif[numargs].vlan = vln + 1;
-    }
-  }
-#endif
 
   if (!args_info.radiussecret_arg) {
     syslog(LOG_ERR, "radiussecret must be specified!");
@@ -709,29 +535,6 @@ int main(int argc, char **argv) {
     }
   }
 
-#ifdef ENABLE_FORCEDNS
-  _options.forcedns1_port = args_info.forcedns1port_arg;
-  if (args_info.forcedns1port_arg && !args_info.forcedns1_arg) {
-    _options.forcedns1_addr.s_addr = _options.uamlisten.s_addr;
-  } else if (args_info.forcedns1_arg) {
-    if (!inet_aton(args_info.forcedns1_arg, &_options.forcedns1_addr)) {
-      syslog(LOG_ERR, "Invalid DNS IP address: %s!", args_info.forcedns1_arg);
-      if (!args_info.forgiving_flag)
-	goto end_processing;
-    }
-  }
-  _options.forcedns2_port = args_info.forcedns2port_arg;
-  if (args_info.forcedns2port_arg && !args_info.forcedns2_arg) {
-    _options.forcedns2_addr.s_addr = _options.uamlisten.s_addr;
-  } else if (args_info.forcedns2_arg) {
-    if (!inet_aton(args_info.forcedns2_arg, &_options.forcedns2_addr)) {
-      syslog(LOG_ERR, "Invalid DNS IP address: %s!", args_info.forcedns2_arg);
-      if (!args_info.forgiving_flag)
-	goto end_processing;
-    }
-  }
-#endif
-
   _options.uamanydns = args_info.uamanydns_flag;
 #ifdef ENABLE_UAMANYIP
   _options.uamanyip = args_info.uamanyip_flag;
@@ -739,17 +542,6 @@ int main(int argc, char **argv) {
 #endif
   _options.dnsparanoia = args_info.dnsparanoia_flag;
   _options.radiusoriginalurl = args_info.radiusoriginalurl_flag;
-  _options.routeonetone = args_info.routeonetone_flag;
-
-#ifdef HAVE_PATRICIA
-  _options.patricia = args_info.patricia_flag;
-#endif
-
-#ifdef ENABLE_GARDENACCOUNTING
-  _options.nousergardendata = args_info.nousergardendata_flag;
-  _options.uamgardendata = args_info.uamgardendata_flag;
-  _options.uamotherdata = args_info.uamotherdata_flag;
-#endif
 
   for (numargs = 0; numargs < args_info.uamallowed_given; ++numargs) {
     pass_throughs_from_string(_options.pass_throughs,
@@ -762,70 +554,6 @@ int main(int argc, char **argv) {
                               );
   }
   _options.uamauthedallowed = args_info.uamauthedallowed_flag;
-#ifdef ENABLE_AUTHEDALLOWED
-  for (numargs = 0; numargs < args_info.authedallowed_given; ++numargs) {
-    pass_throughs_from_string(_options.authed_pass_throughs,
-			      MAX_PASS_THROUGHS,
-			      &_options.num_authed_pass_throughs,
-			      args_info.authedallowed_arg[numargs], 0, 0
-#ifdef HAVE_PATRICIA
-			      , 0
-#endif
-                              );
-  }
-#endif
-
-#ifdef ENABLE_DHCPOPT
-  _options.dhcp_options_len = 0;
-  for (numargs = 0; numargs < args_info.dhcpopt_given; ++numargs) {
-    unsigned char binopt[128];
-    int hex_length = strlen(args_info.dhcpopt_arg[numargs]);
-    int bin_length = hex_length / 2;
-    if (hex_length > 0 && (bin_length * 2) == hex_length &&
-	bin_length < sizeof(binopt)) {
-      syslog(LOG_DEBUG, "DHCP Options %s", args_info.dhcpopt_arg[numargs]);
-      if (redir_hextochar((unsigned char *)args_info.dhcpopt_arg[numargs],
-			  hex_length, binopt, bin_length) == 0) {
-	if (_options.dhcp_options_len + bin_length <
-	    sizeof(_options.dhcp_options)) {
-	  memcpy(_options.dhcp_options +
-		 _options.dhcp_options_len,
-		 binopt, bin_length);
-	  _options.dhcp_options_len += bin_length;
-	} else {
-	  syslog(LOG_DEBUG, "No room for DHCP option %d", (int)binopt[0]);
-	}
-      } else {
-	syslog(LOG_DEBUG, "Bad DHCP option hex encoding");
-      }
-    } else {
-      syslog(LOG_DEBUG, "DHCP options are hex encoded binary");
-    }
-  }
-#endif
-
-#ifdef ENABLE_CHILLIREDIR
-  /*
-    for (numargs = 0; numargs < MAX_REGEX_PASS_THROUGHS; ++numargs) {
-    if (_options.regex_pass_throughs[numargs].re_host.allocated)
-    regfree(&_options.regex_pass_throughs[numargs].re_host);
-    if (_options.regex_pass_throughs[numargs].re_path.allocated)
-    regfree(&_options.regex_pass_throughs[numargs].re_path);
-    if (_options.regex_pass_throughs[numargs].re_qs.allocated)
-    regfree(&_options.regex_pass_throughs[numargs].re_qs);
-    }
-  */
-
-  memset(_options.regex_pass_throughs, 0, sizeof(_options.regex_pass_throughs));
-  _options.regex_num_pass_throughs = 0;
-
-  for (numargs = 0; numargs < args_info.uamregex_given; ++numargs) {
-    regex_pass_throughs_from_string(_options.regex_pass_throughs,
-				    MAX_REGEX_PASS_THROUGHS,
-				    &_options.regex_num_pass_throughs,
-				    args_info.uamregex_arg[numargs], 0);
-  }
-#endif
 
   for (numargs = 0; numargs < MAX_UAM_DOMAINS; ++numargs) {
     if (_options.uamdomains[numargs])
@@ -1019,8 +747,8 @@ int main(int argc, char **argv) {
 
   /* If no listen option is specified listen to any local port    */
   /* Do hostname lookup to translate hostname to IP address       */
-  if (args_info.proxylisten_arg) {
 #ifdef ENABLE_RADPROXY
+  if (args_info.proxylisten_arg) {
     if (!(host = gethostbyname(args_info.proxylisten_arg))) {
       syslog(LOG_ERR, "Invalid listening address: %s! [%s]",
              args_info.proxylisten_arg, strerror(errno));
@@ -1033,14 +761,10 @@ int main(int argc, char **argv) {
   }
   else {
     _options.proxylisten.s_addr = htonl(INADDR_ANY);
-#elif (_debug_)
-    syslog(LOG_WARNING, "radproxy not implemented. build with --enable-radproxy");
-#endif
   }
 
   /* Store proxyclient as in_addr net and mask                       */
   if (args_info.proxyclient_arg) {
-#ifdef ENABLE_RADPROXY
     if(option_aton(&_options.proxyaddr, &_options.proxymask,
 		   args_info.proxyclient_arg, 0)) {
       syslog(LOG_ERR, "Invalid proxy client address: %s!", args_info.proxyclient_arg);
@@ -1051,10 +775,8 @@ int main(int argc, char **argv) {
   else {
     _options.proxyaddr.s_addr = ~0; /* Let nobody through */
     _options.proxymask.s_addr = 0;
-#elif (_debug_)
-    syslog(LOG_WARNING, "radproxy not implemented. build with --enable-radproxy");
-#endif
   }
+#endif
 
   memset(_options.macok, 0, sizeof(_options.macok));
   _options.macoklen = 0;
@@ -1128,19 +850,8 @@ int main(int argc, char **argv) {
   _options.unixipc = STRDUP(args_info.unixipc_arg);
 #endif
 
-#ifdef ENABLE_WPAD
-  _options.wpadpacfile = STRDUP(args_info.wpadpacfile_arg);
-#endif
-
 #ifdef HAVE_NETFILTER_COOVA
   _options.kname = STRDUP(args_info.kname_arg);
-#endif
-
-#ifdef ENABLE_IPWHITELIST
-  _options.ipwhitelist = STRDUP(args_info.ipwhitelist_arg);
-#else
-  if (args_info.ipwhitelist_arg)
-    syslog(LOG_ERR, "option ipwhitelist given when no support built-in");
 #endif
 
 #ifdef ENABLE_RADPROXY
@@ -1152,59 +863,11 @@ int main(int argc, char **argv) {
   }
 #endif
 
-#ifdef ENABLE_EXTADMVSA
-  if (args_info.extadmvsa_given) {
-    for (numargs = 0; numargs < args_info.extadmvsa_given
-             && numargs < EXTADMVSA_ATTR_CNT; ++numargs)  {
-      int len = strlen(args_info.extadmvsa_arg[numargs]);
-      if (len > 0 && len < 256) {
-	unsigned int i[2];
-	char s[256];
-
-	if (sscanf(args_info.extadmvsa_arg[numargs],
-		   "%u,%u:%s", &i[0], &i[1], s) == 3) {
-	  char *idx = strchr(s, ':');
-	  _options.extadmvsa[numargs].attr_vsa = i[0];
-	  _options.extadmvsa[numargs].attr = i[1];
-	  if (idx) *idx = 0;
-	  strlcpy(_options.extadmvsa[numargs].script,
-                  s, sizeof(_options.extadmvsa[numargs].script));
-	  if (idx) {
-	    strlcpy(_options.extadmvsa[numargs].data,
-                    idx + 1, sizeof(_options.extadmvsa[numargs].data));
-	  }
-	} else if (sscanf(args_info.extadmvsa_arg[numargs],
-			  "%u:%s", &i[0], s) == 2) {
-	  char *idx = strchr(s, ':');
-	  _options.extadmvsa[numargs].attr = i[0];
-	  if (idx) *idx = 0;
-	  strlcpy(_options.extadmvsa[numargs].script,
-                  s, sizeof(_options.extadmvsa[numargs].script));
-	  if (idx) {
-	    strlcpy(_options.extadmvsa[numargs].data,
-                    idx + 1, sizeof(_options.extadmvsa[numargs].data));
-	  }
-	} else {
-	  syslog(LOG_ERR, "invalid input %s", args_info.extadmvsa_arg[numargs]);
-	}
-      }
-
-      syslog(LOG_DEBUG, "Extended admin-user attr (%d/%d) data=%s script=%s",
-             (int)_options.extadmvsa[numargs].attr_vsa,
-             (int)_options.extadmvsa[numargs].attr,
-             _options.extadmvsa[numargs].data,
-             _options.extadmvsa[numargs].script);
-    }
-  }
-#endif
-
-  _options.routeif = STRDUP(args_info.routeif_arg);
   _options.wwwdir = STRDUP(args_info.wwwdir_arg);
   _options.wwwbin = STRDUP(args_info.wwwbin_arg);
   _options.uamui = STRDUP(args_info.uamui_arg);
   _options.localusers = STRDUP(args_info.localusers_arg);
   _options.uamurl = STRDUP(args_info.uamserver_arg);
-  _options.uamaaaurl = STRDUP(args_info.uamaaaurl_arg);
   _options.uamhomepage = STRDUP(args_info.uamhomepage_arg);
   _options.uamsecret = STRDUP(args_info.uamsecret_arg);
   _options.macsuffix = STRDUP(args_info.macsuffix_arg);
@@ -1212,7 +875,6 @@ int main(int argc, char **argv) {
   _options.adminuser = STRDUP(args_info.adminuser_arg);
   _options.adminpasswd = STRDUP(args_info.adminpasswd_arg);
   _options.adminupdatefile = STRDUP(args_info.adminupdatefile_arg);
-  _options.rtmonfile = STRDUP(args_info.rtmonfile_arg);
   _options.ssid = STRDUP(args_info.ssid_arg);
   _options.vlan = STRDUP(args_info.vlan_arg);
   _options.nasmac = STRDUP(args_info.nasmac_arg);
@@ -1245,9 +907,6 @@ int main(int argc, char **argv) {
   _options.ieee8021q = args_info.ieee8021q_flag;
   _options.ieee8021q_only = args_info.only8021q_flag;
   _options.vlanupdate = STRDUP(args_info.vlanupdate_arg);
-#endif
-#ifdef ENABLE_PROXYVSA
-  _options.locationupdate = STRDUP(args_info.locationupdate_arg);
 #endif
   _options.nochallenge = args_info.nochallenge_flag;
 #ifdef EX_OPT_MAIN
