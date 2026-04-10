@@ -19,10 +19,6 @@
  */
 
 #include "chilli.h"
-#ifdef ENABLE_MODULES
-#include "chilli_module.h"
-#endif
-
 #define deeplog 0
 
 static int
@@ -1995,28 +1991,6 @@ int radius_decaps(struct radius_t *this, int idx) {
 #ifdef ENABLE_EXTADMVSA
   chilli_extadmvsa(this, (struct app_conn_t *)cbp,
 		   &pack, &pack_req);
-#endif
-
-#ifdef ENABLE_MODULES
-  { int i;
-    for (i=0; i < MAX_MODULES; i++) {
-      if (!_options.modules[i].name[0]) break;
-      if (_options.modules[i].ctx) {
-	struct chilli_module *m =
-            (struct chilli_module *)_options.modules[i].ctx;
-	if (m->radius_handler) {
-	  int res = m->radius_handler(this, (struct app_conn_t *)cbp,
-				      &pack, &pack_req);
-	  switch (res) {
-            case CHILLI_RADIUS_OK:
-              break;
-            default:
-              return 0;
-	  }
-	}
-      }
-    }
-  }
 #endif
 
   switch (pack.code) {

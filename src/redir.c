@@ -20,9 +20,6 @@
 
 #include "system.h"
 #include "chilli.h"
-#ifdef ENABLE_MODULES
-#include "chilli_module.h"
-#endif
 #include "json/json.h"
 
 static int optionsdebug = 0; /* TODO: Should be changed to instance */
@@ -3097,11 +3094,6 @@ int redir_main(struct redir_t *redir,
       }
       else {
 
-#ifdef ENABLE_MODULES
-        int i;
-        int flags = 0;
-#endif
-
         if (!forked) {
           /*
            *  When waiting for RADIUS, we need to be forked.
@@ -3113,43 +3105,13 @@ int redir_main(struct redir_t *redir,
           }
         }
 
-#ifdef ENABLE_MODULES
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): checking modules...", __FUNCTION__, __LINE__);
-        for (i=0; i < MAX_MODULES; i++) {
-          if (!_options.modules[i].name[0]) break;
-          if (_options.modules[i].ctx) {
-            struct chilli_module *m =
-                (struct chilli_module *)_options.modules[i].ctx;
-            if (m->redir_login) {
-              int modresult = m->redir_login(redir, &conn, &socket);
-              flags |= modresult;
-              switch(chilli_mod_state(modresult)) {
-                case CHILLI_MOD_ERROR:
-                  return redir_main_exit(&socket, forked, rreq);
-                default:
-                  break;
-              }
-            }
-          }
-        }
-        if (flags & CHILLI_MOD_REDIR_SKIP_RADIUS) {
-          if (_options.debug)
-            syslog(LOG_DEBUG, "%s(%d): Skipping RADIUS authentication", __FUNCTION__, __LINE__);
-        } else {
-#endif
+        termstate = REDIR_TERM_RADIUS;
 
-          termstate = REDIR_TERM_RADIUS;
+        if (optionsdebug)
+          syslog(LOG_DEBUG, "%s(%d): redir_accept: Sending RADIUS request", __FUNCTION__, __LINE__);
 
-          if (optionsdebug)
-            syslog(LOG_DEBUG, "%s(%d): redir_accept: Sending RADIUS request", __FUNCTION__, __LINE__);
-
-          redir_radius(redir, &address->sin_addr, &conn, reauth);
-          termstate = REDIR_TERM_REPLY;
-
-#ifdef ENABLE_MODULES
-        }
-#endif
+        redir_radius(redir, &address->sin_addr, &conn, reauth);
+        termstate = REDIR_TERM_REPLY;
 
 #if(_debug_ > 1)
         if (_options.debug)

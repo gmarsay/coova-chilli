@@ -19,10 +19,6 @@
  */
 
 #include "chilli.h"
-#ifdef ENABLE_MODULES
-#include "chilli_module.h"
-#endif
-
 #ifdef USING_MMAP
 #include <sys/mman.h>
 #include <linux/filter.h>
@@ -290,21 +286,6 @@ int net_select_init(select_ctx *sctx) {
 }
 
 int net_select_prepare(select_ctx *sctx) {
-
-#ifdef ENABLE_MODULES
-  {
-    int i;
-    for (i=0; i < MAX_MODULES; i++) {
-      if (!_options.modules[i].name[0]) break;
-      if (_options.modules[i].ctx) {
-	struct chilli_module *m =
-            (struct chilli_module *)_options.modules[i].ctx;
-	if (m->net_select)
-	  m->net_select(sctx);
-      }
-    }
-  }
-#endif
 
 #if defined(USING_POLL) && defined(HAVE_SYS_EPOLL_H)
   /* nothing */

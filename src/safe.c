@@ -19,9 +19,6 @@
  */
 
 #include "chilli.h"
-#ifdef ENABLE_MODULES
-#include "chilli_module.h"
-#endif
 
 int safe_accept(int fd, struct sockaddr *sa, socklen_t *lenptr) {
   int ret;

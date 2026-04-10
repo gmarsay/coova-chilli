@@ -19,9 +19,6 @@
  */
 
 #include "chilli.h"
-#ifdef ENABLE_MODULES
-#include "chilli_module.h"
-#endif
 
 void options_init(void) {
   memset(&_options, 0, sizeof(_options));
@@ -226,10 +223,6 @@ int options_fromfd(int fd, bstring bt) {
   size_t len;
   int i;
 
-#ifdef ENABLE_MODULES
-  char isReload[MAX_MODULES];
-#endif
-
   int rd = safe_read(fd, &o, sizeof(o));
 
   if (rd == sizeof(o)) {
@@ -340,9 +333,6 @@ int options_fromfd(int fd, bstring bt) {
 #ifdef ENABLE_UAMDOMAINFILE
   if (!option_s_l(bt, &o.uamdomainfile)) return 0;
 #endif
-#ifdef ENABLE_MODULES
-  if (!option_s_l(bt, &o.moddir)) return 0;
-#endif
 
   if (!option_s_l(bt, &o.adminuser)) return 0;
   if (!option_s_l(bt, &o.adminpasswd)) return 0;
@@ -384,43 +374,9 @@ int options_fromfd(int fd, bstring bt) {
   }
 #endif
 
-#ifdef ENABLE_MODULES
-  for (i=0; i < MAX_MODULES; i++) {
-    isReload[i]=0;
-    if (!_options.modules[i].name[0]) break;
-    if (!_options.modules[i].ctx) continue;
-    else {
-      struct chilli_module *m =
-          (struct chilli_module *)_options.modules[i].ctx;
-      if (!strcmp(_options.modules[i].name, o.modules[i].name))
-	isReload[i]=1;
-      if (m->destroy)
-	m->destroy(isReload[i]);
-    }
-    syslog(LOG_DEBUG, "Unloading module %s",_options.modules[i].name);
-    chilli_module_unload(_options.modules[i].ctx);
-  }
-#endif
-
   if (_options._data) free(_options._data);
   memcpy(&_options, &o, sizeof(o));
   _options._data = (char *)bt->data;
-
-#ifdef ENABLE_MODULES
-  syslog(LOG_DEBUG, "Loading modules");
-  for (i=0; i < MAX_MODULES; i++) {
-    if (!_options.modules[i].name[0]) break;
-    syslog(LOG_DEBUG, "Loading module %s",_options.modules[i].name);
-    chilli_module_load(&_options.modules[i].ctx,
-		       _options.modules[i].name);
-    if (_options.modules[i].ctx) {
-      struct chilli_module *m =
-          (struct chilli_module *)_options.modules[i].ctx;
-      if (m->initialize)
-	m->initialize(_options.modules[i].conf, isReload[i]);
-    }
-  }
-#endif
 
   /*
    *  We took the buffer and this bt will be destroyed.
@@ -531,9 +487,6 @@ int options_save(char *file, bstring bt) {
 #endif
 #ifdef ENABLE_UAMDOMAINFILE
   if (!option_s_s(bt, &o.uamdomainfile)) return 0;
-#endif
-#ifdef ENABLE_MODULES
-  if (!option_s_s(bt, &o.moddir)) return 0;
 #endif
 
   if (!option_s_s(bt, &o.adminuser)) return 0;
@@ -657,22 +610,6 @@ void options_destroy(void) {
 
 void options_cleanup(void) {
   char file[128];
-
-#ifdef ENABLE_MODULES
-  int i;
-  for (i=0; i < MAX_MODULES; i++) {
-    if (!_options.modules[i].name[0]) break;
-    if (!_options.modules[i].ctx) continue;
-    else {
-      struct chilli_module *m =
-          (struct chilli_module *)_options.modules[i].ctx;
-      if (m->destroy)
-	m->destroy(0);
-    }
-    syslog(LOG_DEBUG, "Unloading module %s",_options.modules[i].name);
-    chilli_module_unload(_options.modules[i].ctx);
-  }
-#endif
 
   chilli_binconfig(file, sizeof(file), getpid());
   syslog(LOG_DEBUG, "Removing %s", file);

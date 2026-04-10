@@ -20,10 +20,6 @@
 
 #include "chilli.h"
 #include "bstrlib.h"
-#ifdef ENABLE_MODULES
-#include "chilli_module.h"
-#endif
-
 struct tun_t *tun;                /* TUN instance            */
 struct ippool_t *ippool;          /* Pool of IP addresses */
 struct radius_t *radius;          /* Radius client instance */
@@ -1144,20 +1140,6 @@ void session_interval(struct app_conn_t *conn) {
     else if ((conn->s_params.interim_interval) &&
 	     (interimtime >= conn->s_params.interim_interval)) {
 
-#ifdef ENABLE_MODULES
-      { int i;
-	for (i=0; i < MAX_MODULES; i++) {
-	  if (!_options.modules[i].name[0]) break;
-	  if (_options.modules[i].ctx) {
-	    struct chilli_module *m =
-                (struct chilli_module *)_options.modules[i].ctx;
-	    if (m->session_update)
-              m->session_update(conn);
-	  }
-	}
-      }
-#endif
-
       acct_req(ACCT_USER, conn, RADIUS_STATUS_TYPE_INTERIM_UPDATE);
     }
   }
@@ -1459,27 +1441,6 @@ int chilli_req_attrs(struct radius_t *radius,
     radius_addattr(radius, pack, RADIUS_ATTR_NAS_IDENTIFIER, 0, 0, 0,
 		   (uint8_t*) _options.radiusnasid, strlen(_options.radiusnasid));
   }
-
-#ifdef ENABLE_MODULES
-  { int i;
-    for (i=0; i < MAX_MODULES; i++) {
-      if (!_options.modules[i].name[0]) break;
-      if (_options.modules[i].ctx) {
-	struct chilli_module *m =
-            (struct chilli_module *)_options.modules[i].ctx;
-	if (m->radius_handler) {
-	  int res = m->radius_handler(radius, 0, pack, 0);
-	  switch (res) {
-            case CHILLI_RADIUS_OK:
-              break;
-            default:
-              return 0;
-	  }
-	}
-      }
-    }
-  }
-#endif
 
   return 0;
 }
@@ -2292,20 +2253,6 @@ int dnprot_accept(struct app_conn_t *appconn) {
 #ifdef HAVE_NETFILTER_COOVA
     if (_options.kname) {
       kmod_coova_update(appconn);
-    }
-#endif
-
-#ifdef ENABLE_MODULES
-    { int i;
-      for (i=0; i < MAX_MODULES; i++) {
-	if (!_options.modules[i].name[0]) break;
-	if (_options.modules[i].ctx) {
-	  struct chilli_module *m =
-              (struct chilli_module *)_options.modules[i].ctx;
-	  if (m->session_start)
-	    m->session_start(appconn);
-	}
-      }
     }
 #endif
 
@@ -3624,20 +3571,6 @@ session_disconnect(struct app_conn_t *appconn,
 		   struct dhcp_conn_t *dhcpconn,
 		   int term_cause) {
 
-#ifdef ENABLE_MODULES
-  { int i;
-    for (i=0; i < MAX_MODULES; i++) {
-      if (!_options.modules[i].name[0]) break;
-      if (_options.modules[i].ctx) {
-        struct chilli_module *m =
-	    (struct chilli_module *)_options.modules[i].ctx;
-        if (m->dhcp_disconnect)
-          m->dhcp_disconnect(appconn, dhcpconn);
-      }
-    }
-  }
-#endif
-
   terminate_appconn(appconn,
 		    term_cause ? term_cause :
 		    appconn->s_state.terminate_cause ?
@@ -4862,20 +4795,6 @@ int cb_dhcp_request(struct dhcp_conn_t *conn, struct in_addr *addr,
       syslog(LOG_DEBUG, "%s(%d): Client MAC="MAC_FMT" assigned IP %s" , __FUNCTION__, __LINE__,
              MAC_ARG(conn->hismac), inet_ntoa(appconn->hisip));
 
-#ifdef ENABLE_MODULES
-    { int i;
-      for (i=0; i < MAX_MODULES; i++) {
-	if (!_options.modules[i].name[0]) break;
-	if (_options.modules[i].ctx) {
-	  struct chilli_module *m =
-              (struct chilli_module *)_options.modules[i].ctx;
-	  if (m->dhcp_connect)
-	    m->dhcp_connect(appconn, conn);
-	}
-      }
-    }
-#endif
-
     /* TODO: Too many "listen" and "our" addresses hanging around */
     if (!appconn->ourip.s_addr)
       appconn->ourip.s_addr = _options.dhcplisten.s_addr;
@@ -5267,20 +5186,6 @@ int terminate_appconn(struct app_conn_t *appconn, int terminate_cause) {
     dnprot_terminate(appconn);
 
     appconn->s_state.terminate_cause = terminate_cause;
-
-#ifdef ENABLE_MODULES
-    { int i;
-      for (i=0; i < MAX_MODULES; i++) {
-	if (!_options.modules[i].name[0]) break;
-	if (_options.modules[i].ctx) {
-	  struct chilli_module *m =
-              (struct chilli_module *)_options.modules[i].ctx;
-	  if (m->session_stop)
-	    m->session_stop(appconn);
-	}
-      }
-    }
-#endif
 
     if (_options.condown && !(appconn->s_params.flags & NO_SCRIPT)) {
       if (_options.debug)
@@ -6225,31 +6130,9 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
       break;
 
     default:
-      {
-        char unknown = 1;
-#ifdef ENABLE_MODULES
-        int i;
-        for (i=0; i < MAX_MODULES; i++) {
-          if (!_options.modules[i].name[0]) break;
-          if (_options.modules[i].ctx) {
-            struct chilli_module *m =
-                (struct chilli_module *)_options.modules[i].ctx;
-            if (m->cmdsock_handler) {
-              switch (m->cmdsock_handler(req, s, sock)) {
-                case CHILLI_CMDSOCK_OK:
-                  unknown = 0;
-                  break;
-              }
-            }
-          }
-        }
-#endif
-        if (unknown) {
-          syslog(LOG_ERR, "unknown cmdsock command");
-          safe_close(sock);
-          return -1;
-        }
-      }
+      syslog(LOG_ERR, "unknown cmdsock command");
+      safe_close(sock);
+      return -1;
   }
 
   return 0;

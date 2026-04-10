@@ -678,15 +678,6 @@ if test x"$enable_ssdp" = xyes ; then
    AC_DEFINE(ENABLE_SSDP,1,[Define to enable Simple Service Discovery Protocol])
 fi
 
-AC_ARG_ENABLE(modules, [AS_HELP_STRING([--enable-modules],[Enable dynamically loadable modules (experimental)])], 
-  enable_modules=$enableval, enable_modules=no)
-
-if test x"$enable_modules" = xyes ; then
-   AC_DEFINE(ENABLE_MODULES,1,[Define to enable dynamically loadable modules])
-fi
-
-AM_CONDITIONAL(WITH_MODULES, [test x"$enable_modules" = xyes])
-
 AC_ARG_ENABLE(extadmvsa, [AS_HELP_STRING([--enable-extadmvsa],[Enable admin-user VSA attribute support])], 
   enable_extadmvsa=$enableval, enable_extadmvsa=no)
 

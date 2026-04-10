@@ -132,9 +132,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_MINIPORTAL
     "ENABLE_MINIPORTAL "
 #endif
-#ifdef ENABLE_MODULES
-    "ENABLE_MODULES "
-#endif
 #ifdef ENABLE_MULTILAN
     "ENABLE_MULTILAN "
 #endif
@@ -845,31 +842,6 @@ int main(int argc, char **argv) {
   }
 #endif
 
-#ifdef ENABLE_MODULES
-  memset(_options.modules, 0, sizeof(_options.modules));
-  for (numargs = 0; numargs < args_info.module_given; ++numargs) {
-    if (numargs < MAX_MODULES) {
-      char *n, *sc;
-      int len, nlen;
-
-      n = args_info.module_arg[numargs];
-      len = strlen(n);
-      sc = strchr(n, ';');
-      if (!sc) sc = strchr(n, ':');
-      nlen = sc ? (sc - n) : len;
-
-      snprintf(_options.modules[numargs].name,
-		    sizeof(_options.modules[numargs].name),
-		    "%.*s", nlen, n);
-      if (sc && len > (nlen + 1)) {
-	snprintf(_options.modules[numargs].conf,
-		      sizeof(_options.modules[numargs].conf),
-		      "%.*s", len - nlen - 1, sc + 1);
-      }
-    }
-  }
-#endif
-
 #ifdef ENABLE_CHILLIREDIR
   /*
     for (numargs = 0; numargs < MAX_REGEX_PASS_THROUGHS; ++numargs) {
@@ -1226,13 +1198,6 @@ int main(int argc, char **argv) {
 #else
   if (args_info.uamdomainfile_arg)
     syslog(LOG_ERR, "option uamdomainfile given when no support built-in");
-#endif
-
-#ifdef ENABLE_MODULES
-  _options.moddir = STRDUP(args_info.moddir_arg);
-#else
-  if (args_info.moddir_arg)
-    syslog(LOG_ERR, "option moddir given when no support built-in");
 #endif
 
 #ifdef ENABLE_RADPROXY

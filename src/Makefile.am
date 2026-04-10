@@ -158,18 +158,6 @@ SUBDIRS += linux
 libchilli_la_SOURCES += kcoova.c
 endif
 
-if WITH_MODULES
-sample_la_SOURCES = sample-mod.c
-sample_la_LDFLAGS = -module -avoid-version
-samplelibdir = $(libdir)/coova-chilli
-samplelib_LTLIBRARIES = sample.la
-libchilli_la_SOURCES += chilli_module.c
-libchilli_la_LIBADD += -ldl
-LDADD += -ldl
-chilliinclude_HEADERS += chilli_module.h
-AM_CFLAGS += -DDEFLIBDIR='"$(libdir)/coova-chilli"'
-endif
-
 if !HAVE_STRLCPY
 libchilli_la_SOURCES += ../extern/strlcpy.c
 endif

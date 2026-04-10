@@ -18,9 +18,6 @@
  */
 
 #include "chilli.h"
-#ifdef ENABLE_MODULES
-#include "chilli_module.h"
-#endif
 
 #ifdef HAVE_AVL
 struct avl_tree loc_search_tree;

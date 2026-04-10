@@ -20,10 +20,6 @@
 
 #include "system.h"
 #include "chilli.h"
-#ifdef ENABLE_MODULES
-#include "chilli_module.h"
-#endif
-
 const uint32_t DHCP_OPTION_MAGIC = 0x63825363;
 static uint8_t bmac[PKT_ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 static uint8_t nmac[PKT_ETH_ALEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -1529,9 +1525,6 @@ int dhcp_dns(struct dhcp_conn_t *conn, uint8_t *pack,
 
   } else {
 
-#if defined(ENABLE_MODULES)
-    struct app_conn_t *appconn = dhcp_get_appconn_pkt(conn, pkt_iphdr(pack), !isReq);
-#endif
     struct dns_packet_t *dnsp = pkt_dnspkt(pack);
 
     size_t dlen = *plen - DHCP_DNS_HLEN - sizeofudp(pack);
@@ -1566,31 +1559,6 @@ int dhcp_dns(struct dhcp_conn_t *conn, uint8_t *pack,
       syslog(LOG_DEBUG, "%s(%d): dhcp_dns plen=%zd dlen=%zd olen=%zd", __FUNCTION__, __LINE__, *plen, dlen, olen);
       syslog(LOG_DEBUG, "%s(%d): DNS ID:    %d", __FUNCTION__, __LINE__, id);
       syslog(LOG_DEBUG, "%s(%d): DNS Flags: %d", __FUNCTION__, __LINE__, flags);
-    }
-#endif
-
-#ifdef ENABLE_MODULES
-    { int i, res=0;
-      for (i=0; i < MAX_MODULES; i++) {
-	if (!_options.modules[i].name[0]) break;
-	if (_options.modules[i].ctx) {
-	  struct chilli_module *m =
-              (struct chilli_module *)_options.modules[i].ctx;
-	  if (m->dns_handler)
-	    res = m->dns_handler(appconn, conn,
-				 pack, plen, isReq);
-	  switch (res) {
-	    case CHILLI_DNS_MOD:
-	      mod = 1;
-	      break;
-            case CHILLI_DNS_NAK:
-              return dhcp_nakDNS(conn,pack,*plen);
-            case CHILLI_DNS_ERR:
-            case CHILLI_DNS_DROP:
-              return 0;
-	  }
-	}
-      }
     }
 #endif
 
@@ -3030,7 +2998,7 @@ dhcp_handler(int type,
 	     struct dhcp_conn_t *dhcpconn,
 	     uint8_t *pack, size_t len,
 	     uint8_t *packet, size_t pos) {
-#if defined(ENABLE_LOCATION) || defined(ENABLE_MODULES)
+#ifdef ENABLE_LOCATION
   struct app_conn_t *appconn = 0;
 #endif
 
@@ -3060,26 +3028,6 @@ dhcp_handler(int type,
           }
         }
       } break;
-    }
-  }
-#endif
-
-#ifdef ENABLE_MODULES
-  {
-    int i;
-    syslog(LOG_DEBUG, "%s(%d); checking modules...", __FUNCTION__, __LINE__);
-    for (i=0; i < MAX_MODULES; i++) {
-      if (!_options.modules[i].name[0]) break;
-      if (_options.modules[i].ctx) {
-	struct chilli_module *m =
-            (struct chilli_module *)_options.modules[i].ctx;
-	if (m->dhcp_handler) {
-	  pos = m->dhcp_handler(type,
-				appconn, dhcpconn,
-				pack, len,
-				packet, pos);
-	}
-      }
     }
   }
 #endif
