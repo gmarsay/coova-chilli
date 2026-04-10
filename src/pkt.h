@@ -94,19 +94,6 @@ struct pkt_ethhdr8021q_t {
   uint16_t prot;
 } __attribute__((packed));
 
-#ifdef ENABLE_IEEE8023
-struct pkt_llc_t {
-  uint8_t dsap;
-  uint8_t ssap;
-  uint8_t cntl;
-} __attribute__((packed));
-
-struct pkt_llc_snap_t {
-  uint8_t code[3];
-  uint16_t type;
-} __attribute__((packed));
-#endif
-
 #ifdef ENABLE_PPPOE
 struct pkt_pppoe_hdr_t {
 #define PKT_PPPoE_VERSION 0x11

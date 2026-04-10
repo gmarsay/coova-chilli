@@ -639,15 +639,6 @@ fi
 
 AM_CONDITIONAL(WITH_NETBIOS, [test x"$enable_netbios" = xyes])
 
-AC_ARG_ENABLE(ieee8023, [AS_HELP_STRING([--enable-ieee8023],[Enable support for IEEE 802.3 Ethernet])], 
-  enable_ieee8023=$enableval, enable_ieee8023=no)
-
-if test x"$enable_ieee8023" = xyes; then
-   AC_DEFINE(ENABLE_IEEE8023,1,[Define to enable IEEE 802.3])
-fi
-
-AM_CONDITIONAL(WITH_IEEE8023, [test x"$enable_ieee8023" = xyes])
-
 AC_ARG_ENABLE(pppoe, [AS_HELP_STRING([--enable-pppoe],[Enable support for PPPoE])], 
   enable_pppoe=$enableval, enable_pppoe=no)
 

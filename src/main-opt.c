@@ -108,9 +108,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_IEEE8021Q
     "ENABLE_IEEE8021Q "
 #endif
-#ifdef ENABLE_IEEE8023
-    "ENABLE_IEEE8023 "
-#endif
 #ifdef ENABLE_IPV6
     "ENABLE_IPV6 "
 #endif

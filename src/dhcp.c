@@ -4854,30 +4854,6 @@ int dhcp_decaps_cb(void *pctx, struct pkt_buffer *pb) {
 #endif
 
   if (prot < 1518) {
-#ifdef ENABLE_IEEE8023
-    if (!ignore) {
-      uint8_t *p = packet + sizeofeth(packet);
-      struct pkt_llc_t * llc = (struct pkt_llc_t *)p;
-
-      if (llc->dsap == 0xAA &&
-	  llc->ssap == 0xAA &&
-	  llc->cntl == 0x03) {
-
-	struct pkt_llc_snap_t * snap =
-            (struct pkt_llc_snap_t *)(p + sizeof(struct pkt_llc_t));
-
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): Layer2 PROT: IEEE 802.3 LLC SNAP "
-                 " EtherType 0x%.4x", __FUNCTION__, __LINE__, 
-                 ntohs(snap->type));
-      } else {
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): Layer2 PROT: Likely IEEE 802.3: "
-                 "length %d dsap=0x%.2x ssap=0x%.2x ctrl=0x%.2x", __FUNCTION__, __LINE__,
-                 (int) prot, llc->dsap, llc->ssap, llc->cntl);
-      }
-    }
-#endif
 
 #if(0)
       syslog(LOG_DEBUG, "%s(%d): Layer2 PROT: 0x%.4x dropped", __FUNCTION__, __LINE__, prot);
