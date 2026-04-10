@@ -102,10 +102,6 @@ libchilli_la_SOURCES += queue.c
 LDADD += ${LIBNETFILTER_QUEUE}
 endif
 
-if WITH_NETNAT
-libchilli_la_SOURCES += nat.c nat.h
-endif
-
 if WITH_PCAP
 LDADD += ${LIBPCAP}
 endif

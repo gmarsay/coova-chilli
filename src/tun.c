@@ -767,15 +767,6 @@ static int tun_decaps_cb(void *ctx, struct pkt_buffer *pb) {
 #endif
 
   if (c->idx > 0) {
-#ifdef ENABLE_NETNAT
-    struct pkt_udphdr_t *udph = pkt_udphdr(packet);
-    if (iph->daddr == tun(c->this, c->idx).address.s_addr &&
-	ntohs(udph->dst) > 10000 && ntohs(udph->dst) < 30000) {
-      if (nat_undo(c->this, c->idx, packet, length))
-	return -1;
-    }
-#endif
-
 #ifdef ENABLE_MULTIROUTE
     if (_options.routeonetone) {
       iph->daddr = tun(c->this, c->idx).nataddress.s_addr;
@@ -939,14 +930,6 @@ int tun_encaps(struct tun_t *tun, uint8_t *pack, size_t len, int idx) {
       tun(tun, idx).nataddress.s_addr = iph->saddr;
     iph->saddr = tun(tun, idx).address.s_addr;
     chksum(iph);
-  }
-#endif
-
-#ifdef ENABLE_NETNAT
-  if (idx > 0) {
-    if (nat_do(tun, idx, pack, len)) {
-      syslog(LOG_ERR, "unable to nat packet!");
-    }
   }
 #endif
 

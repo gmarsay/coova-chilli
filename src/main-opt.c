@@ -141,9 +141,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_NETBIOS
     "ENABLE_NETBIOS "
 #endif
-#ifdef ENABLE_NETNAT
-    "ENABLE_NETNAT "
-#endif
 #ifdef ENABLE_PROXYVSA
     "ENABLE_PROXYVSA "
 #endif
@@ -992,18 +989,6 @@ int main(int argc, char **argv) {
   else {
     _options.radiuslisten.s_addr = htonl(INADDR_ANY);
   }
-
-#ifdef ENABLE_NETNAT
-  if (args_info.natip_arg) {
-    if (!(host = gethostbyname(args_info.natip_arg))) {
-      syslog(LOG_WARNING, "Invalid natip address: %s! [%s]",
-             args_info.natip_arg, strerror(errno));
-    }
-    else {
-      memcpy(&_options.natip.s_addr, host->h_addr, host->h_length);
-    }
-  }
-#endif
 
   if (args_info.uamlogoutip_arg) {
     if (!(host = gethostbyname(args_info.uamlogoutip_arg))) {

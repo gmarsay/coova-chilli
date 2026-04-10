@@ -685,15 +685,6 @@ if test x"$enable_extadmvsa" = xyes; then
    AC_DEFINE(ENABLE_EXTADMVSA,1,[Define to enable admin-user VSA support])
 fi
 
-AC_ARG_ENABLE(netnat, [AS_HELP_STRING([--enable-netnat],[Enable net interface nat (experimental)])], 
-  enable_netnat=$enableval, enable_netnat=no)
-
-if test x"$enable_netnat" = xyes ; then
-   AC_DEFINE(ENABLE_NETNAT,1,[Define to enable network interface nat])
-fi
-
-AM_CONDITIONAL(WITH_NETNAT, [test x"$enable_netnat" = xyes])
-
 AC_ARG_ENABLE(useragent, [AS_HELP_STRING([--enable-useragent],[Enable recording user-agent])], 
   enable_useragent=$enableval, enable_useragent=no)
 

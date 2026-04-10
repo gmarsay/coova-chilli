@@ -23,9 +23,6 @@
 
 #include "system.h"
 #include "pkt.h"
-#ifdef ENABLE_NETNAT
-#include "nat.h"
-#endif
 
 #ifdef USING_PCAP
 #include <pcap.h>
@@ -246,10 +243,6 @@ typedef struct _net_interface {
 
   /* routing */
   uint8_t gwaddr[PKT_ETH_ALEN];
-
-#ifdef ENABLE_NETNAT
-  nat_t *nat;
-#endif
 
   select_ctx *sctx;
 
