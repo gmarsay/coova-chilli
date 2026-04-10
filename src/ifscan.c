@@ -15,131 +15,251 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ * Petit utilitaire : liste les interfaces IPv4 (ioctl SIOCGIFCONF, Linux).
  */
+
+#include <arpa/inet.h>
+#include <errno.h>
+#include <net/if_arp.h>
+#include <net/if.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
-#include <errno.h>
-
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <net/if.h>
+#include <unistd.h>
 
 #include <sys/ioctl.h>
-#include <net/if_arp.h>
-#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
-#define inaddrr(x) (*(struct in_addr *) &ifr->x[sizeof sa.sin_port])
-#define IFRSIZE   ((int)(size * sizeof (struct ifreq)))
-
-char *get_ip_str(const struct sockaddr *sa, char *s, size_t maxlen)
+static void
+die(const char *msg)
 {
-  switch(sa->sa_family) {
-    case AF_INET:
-      inet_ntop(AF_INET, &(((struct sockaddr_in *)sa)->sin_addr),
-                s, maxlen);
-      break;
-
-    case AF_INET6:
-      inet_ntop(AF_INET6, &(((struct sockaddr_in6 *)sa)->sin6_addr),
-                s, maxlen);
-      break;
-
-    default:
-      strncpy(s, "Unknown AF", maxlen);
-      break;
-  }
-
-  return s;
+	fprintf(stderr, "%s\n", msg);
+	exit(EXIT_FAILURE);
 }
 
-int main(void)
+static void
+die_perror(const char *msg)
 {
-  unsigned char      *u;
-  int                sockfd, size  = 1;
-  struct ifreq       *ifr;
-  struct ifconf      ifc;
-  struct sockaddr_in sa;
+	perror(msg);
+	exit(EXIT_FAILURE);
+}
 
-  if (0 > (sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP))) {
-    fprintf(stderr, "Cannot open socket.\n");
-    exit(EXIT_FAILURE);
-  }
+/* Linux renvoie typiquement une entrée par sizeof(struct ifreq) ; les sockaddr
+ * à taille variable ne sont pas gérées ici (comportement inchangé vs l’original). */
+#define IFSCAN_IFCONF_BYTES(n) ((size_t)(n) * sizeof(struct ifreq))
 
-  ifc.ifc_len = IFRSIZE;
-  ifc.ifc_req = NULL;
+static int
+open_ioctl_socket(void)
+{
+	int fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
 
-  do {
-    ++size;
-    /* realloc buffer size until no overflow occurs  */
-    if (NULL == (ifc.ifc_req = realloc(ifc.ifc_req, IFRSIZE))) {
-      fprintf(stderr, "Out of memory.\n");
-      exit(EXIT_FAILURE);
-    }
-    ifc.ifc_len = IFRSIZE;
-    if (ioctl(sockfd, SIOCGIFCONF, &ifc)) {
-      perror("ioctl SIOCFIFCONF");
-      exit(EXIT_FAILURE);
-    }
-  } while  (IFRSIZE <= ifc.ifc_len);
+	if (fd < 0) {
+		die("Cannot open socket.");
+	}
+	return fd;
+}
 
-  ifr = ifc.ifc_req;
-  for (;(char *) ifr < (char *) ifc.ifc_req + ifc.ifc_len; ++ifr) {
+/*
+ * Alloue / agrandit le tampon ifconf jusqu’à ce que la réponse tienne
+ * (ifc_len < taille tampon).
+ */
+static void
+ifconf_grow_until_fit(int sockfd, struct ifconf *ifc, int *slot_count)
+{
+	for (;;) {
+		struct ifreq *newbuf;
+		size_t bytes;
 
-    char ip[INET6_ADDRSTRLEN];
+		(*slot_count)++;
+		bytes = IFSCAN_IFCONF_BYTES(*slot_count);
+		newbuf = realloc(ifc->ifc_req, bytes);
+		if (newbuf == NULL) {
+			free(ifc->ifc_req);
+			ifc->ifc_req = NULL;
+			die("Out of memory.");
+		}
+		ifc->ifc_req = newbuf;
+		ifc->ifc_len = (int)bytes;
 
-    if (ifr->ifr_addr.sa_data == (ifr+1)->ifr_addr.sa_data) {
-      continue;  /* duplicate, skip it */
-    }
+		if (ioctl(sockfd, SIOCGIFCONF, ifc) != 0) {
+			free(ifc->ifc_req);
+			ifc->ifc_req = NULL;
+			die_perror("ioctl SIOCGIFCONF");
+		}
 
-    if (ioctl(sockfd, SIOCGIFFLAGS, ifr)) {
-      continue;  /* failed to get flags, skip it */
-    }
+		if (ifc->ifc_len < (int)bytes) {
+			break;
+		}
+	}
+}
 
-    printf("Interface:  %s\n", ifr->ifr_name);
-    printf("IP Address: %s\n", get_ip_str(&ifr->ifr_addr, ip, sizeof ip));
-    printf("IP Address: %s\n", inet_ntoa(inaddrr(ifr_addr.sa_data)));
+static void
+format_sockaddr(const struct sockaddr *sa, char *s, size_t maxlen)
+{
+	if (maxlen == 0) {
+		return;
+	}
 
-    if (0 == ioctl(sockfd, SIOCGIFHWADDR, ifr)) {
+	switch (sa->sa_family) {
+	case AF_INET:
+		if (inet_ntop(AF_INET, &((const struct sockaddr_in *)sa)->sin_addr,
+			      s, maxlen) == NULL) {
+			snprintf(s, maxlen, "(inet_ntop AF_INET)");
+		}
+		break;
+	case AF_INET6:
+		if (inet_ntop(AF_INET6, &((const struct sockaddr_in6 *)sa)->sin6_addr,
+			      s, maxlen) == NULL) {
+			snprintf(s, maxlen, "(inet_ntop AF_INET6)");
+		}
+		break;
+	default:
+		snprintf(s, maxlen, "AF %u", (unsigned)sa->sa_family);
+		break;
+	}
+}
 
-      switch (ifr->ifr_hwaddr.sa_family) {
-        default:
-          printf("\n");
-          continue;
-        case  ARPHRD_NETROM:  case  ARPHRD_ETHER:  case  ARPHRD_PPP:
-        case  ARPHRD_EETHER:  case  ARPHRD_IEEE802: break;
-      }
+static void
+format_ipv4(const struct in_addr *addr, char *s, size_t maxlen)
+{
+	if (inet_ntop(AF_INET, addr, s, maxlen) == NULL) {
+		snprintf(s, maxlen, "(inet_ntop)");
+	}
+}
 
-      u = (unsigned char *) &ifr->ifr_addr.sa_data;
+static int
+ipv4_from_sockaddr(const struct sockaddr *sa, struct in_addr *out)
+{
+	if (sa->sa_family != AF_INET) {
+		return -1;
+	}
+	memcpy(out, &((const struct sockaddr_in *)sa)->sin_addr, sizeof(*out));
+	return 0;
+}
 
-      if (u[0] + u[1] + u[2] + u[3] + u[4] + u[5]) {
-        printf("HW Address: %2.2X-%2.2X-%2.2X-%2.2X-%2.2X-%2.2x\n",
+static int
+ipv4_from_ifr_addr(const struct ifreq *ifr, struct in_addr *out)
+{
+	return ipv4_from_sockaddr(&ifr->ifr_addr, out);
+}
+
+static void
+print_hwaddr(const struct ifreq *ifr)
+{
+	const unsigned char *u = (const unsigned char *)ifr->ifr_hwaddr.sa_data;
+	unsigned i;
+	unsigned sum = 0;
+
+	switch (ifr->ifr_hwaddr.sa_family) {
+	case ARPHRD_NETROM:
+	case ARPHRD_ETHER:
+	case ARPHRD_PPP:
+	case ARPHRD_EETHER:
+	case ARPHRD_IEEE802:
+		break;
+	default:
+		return;
+	}
+
+	for (i = 0; i < 6; i++) {
+		sum += u[i];
+	}
+	if (sum == 0) {
+		return;
+	}
+
+	printf("HW Address: %02X-%02X-%02X-%02X-%02X-%02X\n",
 	       u[0], u[1], u[2], u[3], u[4], u[5]);
-      }
-    }
+}
 
-    if (0 == ioctl(sockfd, SIOCGIFNETMASK, ifr) &&
-	strcmp("255.255.255.255", inet_ntoa(inaddrr(ifr_addr.sa_data)))) {
-      printf("Netmask:    %s\n", inet_ntoa(inaddrr(ifr_addr.sa_data)));
-    }
+static void
+print_iface(int sockfd, struct ifreq *ifr)
+{
+	char ip[INET6_ADDRSTRLEN];
+	char addrbuf[INET_ADDRSTRLEN];
+	struct in_addr in;
+	struct sockaddr sa_copy;
 
-    if (ifr->ifr_flags & IFF_BROADCAST) {
-      if (0 == ioctl(sockfd, SIOCGIFBRDADDR, ifr) &&
-	  strcmp("0.0.0.0", inet_ntoa(inaddrr(ifr_addr.sa_data)))) {
-        printf("Broadcast:  %s\n", inet_ntoa(inaddrr(ifr_addr.sa_data)));
-      }
-    }
+	/* L’union ifreq est réutilisée par les ioctl ; on fige l’adresse de SIOCGIFCONF. */
+	memcpy(&sa_copy, &ifr->ifr_addr, sizeof(sa_copy));
 
-    if (0 == ioctl(sockfd, SIOCGIFMTU, ifr)) {
-      printf("MTU:        %u\n",  ifr->ifr_mtu);
-    }
+	if (ioctl(sockfd, SIOCGIFFLAGS, ifr) != 0) {
+		return;
+	}
 
-    if (0 == ioctl(sockfd, SIOCGIFMETRIC, ifr)) {
-      printf("Metric:     %u\n",  ifr->ifr_metric);
-    } printf("\n");
-  }
+	printf("Interface:  %s\n", ifr->ifr_name);
+	format_sockaddr(&sa_copy, ip, sizeof ip);
+	printf("IP Address: %s\n", ip);
 
-  close(sockfd);
-  return EXIT_SUCCESS;
+	if (ipv4_from_sockaddr(&sa_copy, &in) == 0) {
+		format_ipv4(&in, addrbuf, sizeof addrbuf);
+		printf("IP Address: %s\n", addrbuf);
+	}
+
+	if (ioctl(sockfd, SIOCGIFHWADDR, ifr) == 0) {
+		print_hwaddr(ifr);
+	}
+
+	if (ioctl(sockfd, SIOCGIFNETMASK, ifr) == 0 &&
+	    ipv4_from_ifr_addr(ifr, &in) == 0) {
+		struct in_addr allones;
+
+		allones.s_addr = htonl(0xffffffffu);
+		if (in.s_addr != allones.s_addr) {
+			format_ipv4(&in, addrbuf, sizeof addrbuf);
+			printf("Netmask:    %s\n", addrbuf);
+		}
+	}
+
+	if (ifr->ifr_flags & IFF_BROADCAST) {
+		if (ioctl(sockfd, SIOCGIFBRDADDR, ifr) == 0 &&
+		    ipv4_from_ifr_addr(ifr, &in) == 0 &&
+		    in.s_addr != htonl(0)) {
+			format_ipv4(&in, addrbuf, sizeof addrbuf);
+			printf("Broadcast:  %s\n", addrbuf);
+		}
+	}
+
+	if (ioctl(sockfd, SIOCGIFMTU, ifr) == 0) {
+		printf("MTU:        %u\n", (unsigned)ifr->ifr_mtu);
+	}
+
+	if (ioctl(sockfd, SIOCGIFMETRIC, ifr) == 0) {
+		printf("Metric:     %u\n", (unsigned)ifr->ifr_metric);
+	}
+
+	printf("\n");
+}
+
+int
+main(void)
+{
+	int sockfd;
+	struct ifconf ifc;
+	int nslots = 1;
+	struct ifreq *ifr;
+	char *end;
+
+	memset(&ifc, 0, sizeof(ifc));
+	sockfd = open_ioctl_socket();
+
+	ifc.ifc_len = 0;
+	ifc.ifc_req = NULL;
+	ifconf_grow_until_fit(sockfd, &ifc, &nslots);
+
+	end = (char *)ifc.ifc_req + ifc.ifc_len;
+	for (ifr = ifc.ifc_req; (char *)ifr < end; ++ifr) {
+		/* Même test que l’original ; (ifr+1) n’est lu que s’il reste au moins une entrée. */
+		if ((char *)(ifr + 1) < end &&
+		    ifr->ifr_addr.sa_data == (ifr + 1)->ifr_addr.sa_data) {
+			continue;
+		}
+		print_iface(sockfd, ifr);
+	}
+
+	free(ifc.ifc_req);
+	close(sockfd);
+	return EXIT_SUCCESS;
 }
