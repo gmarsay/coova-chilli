@@ -32,7 +32,6 @@
 #define PKT_ETH_PROTO_ARP    0x0806
 #define PKT_ETH_PROTO_WOL    0x0842
 #define PKT_ETH_PROTO_ETHBR  0x6558
-#define PKT_ETH_PROTO_8021Q  0x8100
 #define PKT_ETH_PROTO_IPX    0x8137
 #define PKT_ETH_PROTO_IPv6   0x86dd
 #define PKT_ETH_PROTO_PPP    0x880b
@@ -78,17 +77,6 @@
 struct pkt_ethhdr_t {
   uint8_t  dst[PKT_ETH_ALEN];
   uint8_t  src[PKT_ETH_ALEN];
-  uint16_t prot;
-} __attribute__((packed));
-
-struct pkt_ethhdr8021q_t {
-  uint8_t  dst[PKT_ETH_ALEN];
-  uint8_t  src[PKT_ETH_ALEN];
-  uint16_t tpid;
-#define PKT_8021Q_MASK_VID htons(0x0FFF)
-#define PKT_8021Q_MASK_PCP htons(0xE000)
-#define PKT_8021Q_MASK_CFI htons(0x1000)
-  uint16_t pcp_cfi_vid;
   uint16_t prot;
 } __attribute__((packed));
 
@@ -379,32 +367,11 @@ struct eap_packet_t {
   uint8_t  payload[PKT_EAP_PLEN];
 } __attribute__((packed));
 
-#ifdef ENABLE_IEEE8021Q
-#define is_8021q(pkt) (((struct pkt_ethhdr8021q_t *)pkt)->tpid == htons(PKT_ETH_PROTO_8021Q))
-#define get8021q(pkt) (((struct pkt_ethhdr8021q_t *)pkt)->pcp_cfi_vid)
-
-#define sizeofeth2(is1q) (PKT_ETH_HLEN+((is1q)?4:0))
-#define sizeofeth(pkt)   (sizeofeth2(is_8021q(pkt)))
-#define ethhdr8021q(pkt) ((struct pkt_ethhdr8021q_t *)pkt)
-
-#define copy_ethproto(o,n)                                              \
-  if (is_8021q(o)) {                                                    \
-    ((struct pkt_ethhdr8021q_t *)n)->tpid = htons(PKT_ETH_PROTO_8021Q); \
-    ((struct pkt_ethhdr8021q_t *)n)->pcp_cfi_vid = ((struct pkt_ethhdr8021q_t *)o)->pcp_cfi_vid; \
-    ((struct pkt_ethhdr8021q_t *)n)->prot = ((struct pkt_ethhdr8021q_t *)o)->prot; \
-  } else {                                                              \
-    ((struct pkt_ethhdr_t *)n)->prot = ((struct pkt_ethhdr_t *)o)->prot; \
-  }
-
-#else /* ENABLE_IEEE80211Q */
-
 #define sizeofeth2(x)     (PKT_ETH_HLEN)
 #define sizeofeth(pkt)    (PKT_ETH_HLEN)
-#define copy_ethproto(o,n) {                                            \
-    ((struct pkt_ethhdr_t *)n)->prot = ((struct pkt_ethhdr_t *)o)->prot; \
-  }
-
-#endif /* ENABLE_IEEE80211Q */
+#define copy_ethproto(o,n) do {                                         \
+    ((struct pkt_ethhdr_t *)(n))->prot = ((struct pkt_ethhdr_t *)(o))->prot; \
+  } while (0)
 
 #define sizeofip(pkt)     (sizeofeth(pkt)+((pkt_iphdr(pkt)->version_ihl & 0xf)*4))
 #define sizeofdot1x(pkt)  (sizeofeth(pkt)+PKT_DOT1X_HLEN)
@@ -445,9 +412,9 @@ int pkt_shape_tcpwin(struct pkt_iphdr_t *iph, uint16_t win);
 int pkt_shape_tcpmss(uint8_t *packet, size_t *length);
 
 #if defined(ENABLE_IPV6)
-#define PKT_BUFFER_IPOFF  (sizeof(struct pkt_ethhdr8021q_t)+20)
+#define PKT_BUFFER_IPOFF  (sizeof(struct pkt_ethhdr_t) + 20)
 #else
-#define PKT_BUFFER_IPOFF  (sizeof(struct pkt_ethhdr8021q_t))
+#define PKT_BUFFER_IPOFF  (sizeof(struct pkt_ethhdr_t))
 #endif
 
 struct pkt_buffer {

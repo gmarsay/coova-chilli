@@ -19,43 +19,20 @@
 
 #ifndef _CHILLI_SSL_H_
 #define _CHILLI_SSL_H_
+
 #include "system.h"
 
 #ifdef HAVE_SSL
 
-#ifdef HAVE_MATRIXSSL
-#include "mssl.h"
-typedef struct {
-  sslKeys_t * keys;
-  char ready;
-} openssl_env;
-#endif
-
-#if defined(HAVE_OPENSSL) || defined(HAVE_WOLFSSL)
-
-#ifdef HAVE_OPENSSL
 #include <openssl/buffer.h>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/x509.h>
 #include <openssl/ssl.h>
 #include <openssl/pem.h>
-#include <openssl/engine.h>
 #include <openssl/err.h>
-#elif HAVE_WOLFSSL
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <string.h>
-
-#define OPENSSL_NO_ENGINE
-#include <wolfssl/options.h>
-#include <wolfssl/ssl.h>
-#include <wolfssl/openssl/bio.h>
-#include <wolfssl/openssl/crypto.h>
-#include <wolfssl/openssl/x509.h>
-#include <wolfssl/openssl/ssl.h>
-#include <wolfssl/openssl/pem.h>
+#ifndef OPENSSL_NO_ENGINE
+#include <openssl/engine.h>
 #endif
 
 #define OPENSSL_TMPKEY_MAX      4
@@ -72,14 +49,12 @@ typedef struct {
 #endif
   SSL_METHOD *meth;
   SSL_CTX *ctx;
-#ifdef HAVE_OPENSSL
+#ifndef OPENSSL_NO_ENGINE
   ENGINE *engine;
 #endif
   void *tmpKeys[OPENSSL_TMPKEY_MAX];
   char ready;
 } openssl_env;
-
-#endif
 
 typedef struct {
   openssl_env *env;
@@ -108,5 +83,5 @@ openssl_con *openssl_accept_fd(openssl_env *env, int fd, int timeout, struct red
 openssl_con *openssl_connect_fd(openssl_env *env, int fd, int timeout);
 int openssl_check_accept(openssl_con *c, struct redir_conn_t *);
 
-#endif
-#endif
+#endif /* HAVE_SSL */
+#endif /* _CHILLI_SSL_H_ */

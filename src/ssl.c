@@ -24,57 +24,6 @@ static int openssl_init = 0;
 static openssl_env * sslenv_svr = 0;
 static openssl_env * sslenv_cli = 0;
 
-#ifdef HAVE_WOLFSSL
-#define HAVE_OPENSSL 1
-#else
-#define HAVE_OPENSSL_ENGINE 1
-#endif
-
-openssl_env * initssl() {
-  if (sslenv_svr == 0) {
-    if (openssl_init == 0) {
-      openssl_init = 1;
-#ifdef HAVE_OPENSSL
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-      if (_options.debug) {
-	SSL_load_error_strings();
-      }
-      SSL_library_init();
-      OpenSSL_add_all_algorithms();
-#endif
-#else
-      matrixSslOpen();
-      syslog(LOG_DEBUG, "%s(%d): MatrixSslOpen()", __FUNCTION__, __LINE__);
-#endif
-    }
-    openssl_env_init(sslenv_svr = calloc(1, sizeof(openssl_env)), 0, 1);
-  }
-  return sslenv_svr;
-}
-
-openssl_env * initssl_cli() {
-  if (sslenv_cli == 0) {
-    if (openssl_init == 0) {
-      openssl_init = 1;
-#ifdef HAVE_OPENSSL
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-      if (_options.debug) {
-	SSL_load_error_strings();
-      }
-      SSL_library_init();
-      OpenSSL_add_all_algorithms();
-#endif
-#else
-      matrixSslOpen();
-      syslog(LOG_DEBUG, "%s(%d): MatrixSslOpen()", __FUNCTION__, __LINE__);
-#endif
-    }
-    openssl_env_init(sslenv_cli = calloc(1, sizeof(openssl_env)), 0, 0);
-  }
-  return sslenv_cli;
-}
-
-#ifdef HAVE_OPENSSL
 static int
 openssl_verify_peer_cb(int ok, X509_STORE_CTX *ctx) {
   int err = X509_STORE_CTX_get_error(ctx);
@@ -122,13 +71,8 @@ openssl_cacert_location(openssl_env *env, char *file, char *dir) {
   return err;
 }
 
-int
+static int
 _openssl_env_init(openssl_env *env, char *engine, int server) {
-  /*
-   * Create an OpenSSL environment (method and context).
-   * If ``server'' is 1, the environment is that of a SSL
-   * server.
-   */
   const long options = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION;
   env->meth = SSLv23_method();
   env->ctx = SSL_CTX_new((void *)env->meth);
@@ -154,9 +98,7 @@ _openssl_env_init(openssl_env *env, char *engine, int server) {
   }
 #endif
 
-#ifdef HAVE_OPENSSL_ENGINE
   SSL_CTX_set_app_data(env->ctx, env);
-#endif
 
   if (server) {
     SSL_CTX_set_options(env->ctx, SSL_OP_SINGLE_DH_USE);
@@ -165,15 +107,48 @@ _openssl_env_init(openssl_env *env, char *engine, int server) {
   }
   return 1;
 }
-#endif
 
-#ifdef HAVE_OPENSSL
 static int _openssl_passwd(char *buf, int size, int rwflag, void *ud) {
+  (void)rwflag;
+  (void)ud;
   strlcpy(buf, _options.sslkeypass, size);
   memset(_options.sslkeypass,'x',strlen(_options.sslkeypass));
   return strlen(buf);
 }
+
+openssl_env * initssl() {
+  if (sslenv_svr == 0) {
+    if (openssl_init == 0) {
+      openssl_init = 1;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+      if (_options.debug) {
+	SSL_load_error_strings();
+      }
+      SSL_library_init();
+      OpenSSL_add_all_algorithms();
 #endif
+    }
+    openssl_env_init(sslenv_svr = calloc(1, sizeof(openssl_env)), 0, 1);
+  }
+  return sslenv_svr;
+}
+
+openssl_env * initssl_cli() {
+  if (sslenv_cli == 0) {
+    if (openssl_init == 0) {
+      openssl_init = 1;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+      if (_options.debug) {
+	SSL_load_error_strings();
+      }
+      SSL_library_init();
+      OpenSSL_add_all_algorithms();
+#endif
+    }
+    openssl_env_init(sslenv_cli = calloc(1, sizeof(openssl_env)), 0, 0);
+  }
+  return sslenv_cli;
+}
 
 int
 openssl_env_init(openssl_env *env, char *engine, int server) {
@@ -183,7 +158,6 @@ openssl_env_init(openssl_env *env, char *engine, int server) {
     return 0;
   }
 
-#ifdef HAVE_OPENSSL
   {
     int err = _openssl_env_init(env, engine, server);
 
@@ -207,32 +181,7 @@ openssl_env_init(openssl_env *env, char *engine, int server) {
     env->ready = 1;
     return err;
   }
-#else
-  syslog(LOG_DEBUG, "%s(%d): MatrixSSL Setup:", __FUNCTION__, __LINE__);
-  syslog(LOG_DEBUG, "%s(%d): SSL cert: %s", __FUNCTION__, __LINE__, _options.sslcertfile);
-  syslog(LOG_DEBUG, "%s(%d): SSL key: %s", __FUNCTION__, __LINE__, _options.sslkeyfile);
-  syslog(LOG_DEBUG, "%s(%d): SSL pass: %s", __FUNCTION__, __LINE__, _options.sslkeypass?_options.sslkeypass:"null");
-  syslog(LOG_DEBUG, "%s(%d): SSL ca: %s", __FUNCTION__, __LINE__, _options.sslcafile?_options.sslcafile:"null");
-  if ( matrixSslReadKeys( &env->keys,
-			  _options.sslcertfile,
-			  _options.sslkeyfile,
-			  _options.sslkeypass,
-			  _options.sslcafile ) < 0 ) {
-    syslog(LOG_ERR, "%s: could not load ssl certificate or and/or key file", strerror(errno));
-    return 0;
-  }
-
-  env->ready = 1;
-  return 1;
-#endif
 }
-
-#ifdef HAVE_MATRIXSSL
-static int certValidator(sslCertInfo_t *t, void *arg) {
-  syslog(LOG_DEBUG, "%s(%d): MatrixSSL: certValidator()", __FUNCTION__, __LINE__);
-  return 1;
-}
-#endif
 
 openssl_con *
 openssl_connect_fd(openssl_env *env, int fd, int timeout) {
@@ -240,20 +189,13 @@ openssl_connect_fd(openssl_env *env, int fd, int timeout) {
   if (!c) return 0;
 
   c->env = env;
-#ifdef HAVE_OPENSSL
-  c->con = (SSL *)SSL_new(env->ctx);
-#elif  HAVE_MATRIXSSL
-  c->con = (SSL *)SSL_new(env->keys, 0);
-#endif
+  c->con = SSL_new(env->ctx);
   c->sock = fd;
   c->timeout = timeout;
 
   SSL_set_fd(c->con, c->sock);
 
-#ifdef HAVE_OPENSSL
-#ifdef HAVE_OPENSSL_ENGINE
   SSL_set_app_data(c->con, c);
-#endif
   SSL_set_connect_state(c->con);
 
   if (SSL_connect(c->con) < 0) {
@@ -270,21 +212,12 @@ openssl_connect_fd(openssl_env *env, int fd, int timeout) {
       return 0;
     }
   }
-#elif  HAVE_MATRIXSSL
-  if (!SSL_connect(c->con, certValidator, c)) {
-    syslog(LOG_ERR, "%s: openssl_connect_fd", strerror(errno));
-    openssl_free(c);
-    return 0;
-  }
-#endif
 
   return c;
 }
 
 int
 openssl_check_accept(openssl_con *c, struct redir_conn_t *conn) {
-
-#ifdef HAVE_OPENSSL
   int rc;
 
   if (!c || !c->con) return -1;
@@ -318,7 +251,6 @@ openssl_check_accept(openssl_con *c, struct redir_conn_t *conn) {
 
     } else {
 
-#ifdef HAVE_OPENSSL_ENGINE
       X509 *peer_cert = SSL_get_peer_certificate(c->con);
 
       if (peer_cert) {
@@ -358,24 +290,8 @@ openssl_check_accept(openssl_con *c, struct redir_conn_t *conn) {
       } else {
 	syslog(LOG_DEBUG, "%s(%d): no SSL certificate", __FUNCTION__, __LINE__);
       }
-#endif
     }
   }
-#elif  HAVE_MATRIXSSL
-
-  if (!c || !c->con) return -1;
-
-  if (!SSL_is_init_finished(c->con)) {
-
-    if (SSL_accept2(c->con) < 0) {
-      return -1;
-    }
-
-    if (!SSL_is_init_finished(c->con))
-      return 1;
-  }
-
-#endif
 
   return 0;
 }
@@ -394,29 +310,18 @@ openssl_accept_fd(openssl_env *env, int fd, int timeout, struct redir_conn_t *co
   }
 
   c->env = env;
-#ifdef HAVE_OPENSSL
-  c->con = (SSL *)SSL_new(env->ctx);
-#elif  HAVE_MATRIXSSL
-  c->con = (SSL *)SSL_new(env->keys, SSL_FLAGS_SERVER);
-#endif
+  c->con = SSL_new(env->ctx);
   c->sock = fd;
   c->timeout = timeout;
 
   SSL_set_fd(c->con, c->sock);
 
-#ifdef HAVE_OPENSSL
-#ifdef HAVE_OPENSSL_ENGINE
   SSL_clear(c->con);
-#endif
 
-#ifdef HAVE_OPENSSL_ENGINE
   SSL_set_app_data(c->con, c);
-#endif
   SSL_set_accept_state(c->con);
 
-#ifdef HAVE_OPENSSL_ENGINE
   SSL_set_verify_result(c->con, X509_V_OK);
-#endif
 
   if ((rc = openssl_check_accept(c, conn)) < 0) {
     SSL_set_shutdown(c->con, SSL_RECEIVED_SHUTDOWN);
@@ -424,32 +329,11 @@ openssl_accept_fd(openssl_env *env, int fd, int timeout, struct redir_conn_t *co
     return 0;
   }
 
-#elif  HAVE_MATRIXSSL
-
-  /* ndelay_off(c->sock); */
-
-  matrixSslSetCertValidator(c->con->ssl, certValidator, c->con->keys);
-
-  if ((rc = SSL_accept2(c->con)) < 0) {
-    syslog(LOG_ERR, "%s: SSL accept failure %s", strerror(errno), c->con->status);
-    openssl_free(c);
-    return 0;
-  }
-
-  SSL_is_init_finished(c->con);
-
-  /* ndelay_on(c->sock);*/
-
-#else
-#error NO SSL SUPPORT
-#endif
-
   return c;
 }
 
 int
 openssl_error(openssl_con *con, int ret, char *func) {
-#ifdef HAVE_OPENSSL
   int err = -1;
   if (con->con) {
     err = SSL_get_error(con->con, ret);
@@ -469,13 +353,7 @@ openssl_error(openssl_con *con, int ret, char *func) {
       case SSL_ERROR_WANT_READ: return 1;
       case SSL_ERROR_WANT_WRITE: return 2;
       case SSL_ERROR_SYSCALL:
-        /*
-         * This is a protocol violation, but we got
-         * an EOF (remote connection did a shutdown(fd, 1).
-         * We will treat it as a zero value.
-         */
         if (ret == 0) return 0;
-        /* If some other error, fall through */
       case SSL_ERROR_ZERO_RETURN: openssl_shutdown(con, 0);
       case SSL_ERROR_SSL: return -1;
       default: break;
@@ -483,20 +361,12 @@ openssl_error(openssl_con *con, int ret, char *func) {
     return 1;
   }
   return err;
-#else
-  syslog(LOG_ERR, "%s: ssl error in %s", strerror(errno), func);
-  return 0;
-#endif
 }
 
 void
 openssl_shutdown(openssl_con *con, int state) {
-#ifdef HAVE_OPENSSL
   int i;
-  /*
-   * state is the same as in shutdown(2)
-   */
-  if (con) {
+  if (con && con->con) {
     switch(state) {
       case 0: SSL_set_shutdown(con->con, SSL_RECEIVED_SHUTDOWN); break;
       case 1: SSL_set_shutdown(con->con, SSL_SENT_SHUTDOWN); break;
@@ -506,7 +376,6 @@ openssl_shutdown(openssl_con *con, int state) {
       if (SSL_shutdown(con->con))
 	break;
   }
-#endif
 }
 
 int
@@ -579,9 +448,6 @@ openssl_write(openssl_con *con, char *b, int l, int t) {
       err = openssl_error(con, wrt, "openssl_write");
       if (err == -1) return err;
       else if (err > 0) {
-#if(_debug_)
-	//syslog(LOG_DEBUG, "ssl_repeat_write");
-#endif
 	goto repeat_write;
       }
       break;
@@ -597,9 +463,7 @@ void
 openssl_free(openssl_con *con) {
   SSL *c = con->con;
   if (c) {
-#ifdef HAVE_OPENSSL
     SSL_set_connect_state(c);
-#endif
     SSL_free(c);
     con->con = 0;
   }
@@ -611,11 +475,9 @@ openssl_env_free(openssl_env *env) {
 #if(_debug_)
   syslog(LOG_DEBUG, "%s(%d): Freeing SSL environemnt", __FUNCTION__, __LINE__);
 #endif
-#ifdef HAVE_OPENSSL
   if (env->ctx) SSL_CTX_free(env->ctx);
 #ifndef OPENSSL_NO_ENGINE
   if (env->engine) ENGINE_free(env->engine);
-#endif
 #endif
   free(env);
 }
@@ -624,10 +486,9 @@ int
 openssl_pending(openssl_con *con) {
   if (con->con) {
     int pending = SSL_pending(con->con);
-    /*log_dbg("openssl_pending(%d)", pending);*/
     return pending;
   }
   return 0;
 }
 
-#endif
+#endif /* HAVE_SSL */

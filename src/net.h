@@ -134,11 +134,7 @@ struct queue_item
   unsigned long long	offset;
 
   unsigned		hdrlen;
-  union
-  {
-    struct pkt_ethhdr_t	ethhdr;
-    struct pkt_ethhdr8021q_t ethhdr8021q;
-  };
+  struct pkt_ethhdr_t	ethhdr;
 };
 
 #ifdef ENABLE_LARGELIMITS

@@ -384,74 +384,6 @@ int dhcp_hashdel(struct dhcp_t *this, struct dhcp_conn_t *conn) {
   return 0;
 }
 
-
-#ifdef ENABLE_IEEE8021Q
-int vlanupdate_script(struct dhcp_conn_t *conn, char* script,
-		      uint16_t oldtag) {
-  int status;
-  uint16_t tag;
-
-  if ((status = chilli_fork(CHILLI_PROC_SCRIPT, script)) < 0) {
-    syslog(LOG_ERR, "%s: forking %s", strerror(errno), script);
-    return 0;
-  }
-
-  if (status > 0) { /* Parent */
-    return 0;
-  }
-
-  tag = ntohs(conn->tag8021q & PKT_8021Q_MASK_VID);
-  oldtag = ntohs(oldtag & PKT_8021Q_MASK_VID);
-
-  set_env("DEV", VAL_STRING, tun(tun, 0).devname, 0);
-  set_env("ADDR", VAL_IN_ADDR, &conn->ourip, 0);
-  set_env("FRAMED_IP_ADDRESS", VAL_IN_ADDR, &conn->hisip, 0);
-  set_env("CALLING_STATION_ID", VAL_MAC_ADDR, conn->hismac, 0);
-  set_env("CALLED_STATION_ID", VAL_MAC_ADDR, dhcp_nexthop(dhcp), 0);
-  set_env("NAS_ID", VAL_STRING, _options.radiusnasid, 0);
-  set_env("8021Q_TAG", VAL_USHORT, &tag, 0);
-  set_env("OLD_8021Q_TAG", VAL_USHORT, &oldtag, 0);
-
-  if (execl(
-#ifdef ENABLE_CHILLISCRIPT
-          SBINDIR "/chilli_script", SBINDIR "/chilli_script", _options.binconfig,
-#else
-          script,
-#endif
-          script, (char *) 0) != 0) {
-    syslog(LOG_ERR, "%s: exec %s failed", strerror(errno), script);
-  }
-
-  exit(0);
-}
-
-void dhcp_checktag(struct dhcp_conn_t *conn, uint8_t *pack) {
-  if (_options.ieee8021q && is_8021q(pack)) {
-    uint16_t tag = get8021q(pack);
-    struct app_conn_t * appconn = conn->peer;
-
-    if ((tag & PKT_8021Q_MASK_VID) !=
-	(conn->tag8021q & PKT_8021Q_MASK_VID)) {
-      uint16_t oldtag = conn->tag8021q;
-      conn->tag8021q = tag;
-
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): IEEE 802.1Q: "MAC_FMT" on VLAN %d", __FUNCTION__, __LINE__,
-               MAC_ARG(conn->hismac),
-               (int) ntohs(tag & PKT_8021Q_MASK_VID));
-
-      if (_options.vlanupdate) {
-	vlanupdate_script(conn, _options.vlanupdate, oldtag);
-      }
-
-    }
-    if (appconn) {
-      appconn->s_state.tag8021q = conn->tag8021q;
-    }
-  }
-}
-#endif
-
 /**
  * dhcp_hashget()
  * Uses the hash tables to find a connection based on the mac address.
@@ -532,6 +464,7 @@ int dhcp_getconn(struct dhcp_t *this,
 		 struct dhcp_conn_t **conn,
 		 uint8_t *mac, uint8_t *pkt,
 		 char do_alloc) {
+  (void)pkt;
   if (dhcp_hashget(this, conn, mac)) {
     if (!do_alloc)
       return -1;
@@ -543,17 +476,6 @@ int dhcp_getconn(struct dhcp_t *this,
   if (!*conn)
     return -1;
 
-#ifdef ENABLE_IEEE8021Q
-  if (_options.ieee8021q) {
-    if (pkt) {
-#if(_debug_ > 1)
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): calling dhcp_checktag", __FUNCTION__, __LINE__);
-#endif
-      dhcp_checktag(*conn, pkt);
-    }
-  }
-#endif
   return 0;
 }
 
@@ -3466,16 +3388,6 @@ int dhcp_receive_ip(struct dhcp_ctx *ctx, uint8_t *pack, size_t len) {
 
   dhcp_conn_set_idx(conn, ctx);
 
-#ifdef ENABLE_IEEE8021Q
-  if (_options.ieee8021q) {
-#if(_debug_ > 1)
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): calling dhcp_checktag", __FUNCTION__, __LINE__);
-#endif
-    dhcp_checktag(conn, pack);
-  }
-#endif
-
   /*
    * Sanity check on IP total length
    */
@@ -3625,16 +3537,6 @@ int dhcp_receive_ip(struct dhcp_ctx *ctx, uint8_t *pack, size_t len) {
      authstate == DHCP_AUTH_NONE) {
      this->cb_request(conn, &pack_iph->saddr);
      } */
-
-#ifdef ENABLE_IEEE8021Q
-  if (_options.ieee8021q) {
-#if(_debug_ > 1)
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): calling dhcp_checktag", __FUNCTION__, __LINE__);
-#endif
-    dhcp_checktag(conn, pack);
-  }
-#endif
 
   /*
    *  Request an IP address
@@ -4437,24 +4339,6 @@ int dhcp_decaps_cb(void *pctx, struct pkt_buffer *pb) {
     return 0;
   }
 
-#ifdef ENABLE_IEEE8021Q
-  if (_options.ieee8021q) {
-    if (is_8021q(packet)) {
-      struct pkt_ethhdr8021q_t *ethh;
-      min_length = sizeof(struct pkt_ethhdr8021q_t);
-      if (length < min_length) {
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): bad packet length %zu", __FUNCTION__, __LINE__, length);
-	return 0;
-      }
-      ethh = ethhdr8021q(packet);
-      prot = ntohs(ethh->prot);
-    } else if (_options.ieee8021q_only) {
-      return 0;
-    }
-  }
-#endif
-
   if (!prot) {
     struct pkt_ethhdr_t *ethh = pkt_ethhdr(packet);
     prot = ntohs(ethh->prot);
@@ -4570,22 +4454,11 @@ int dhcp_decaps(struct dhcp_t *this, int idx) {
 static
 int dhcp_ethhdr(struct dhcp_conn_t *conn, uint8_t *packet, uint8_t *hismac,
                 uint8_t *nexthop, uint16_t prot) {
-#ifdef ENABLE_IEEE8021Q
-  if (_options.ieee8021q && conn->tag8021q) {
-    struct pkt_ethhdr8021q_t *pack_ethh = ethhdr8021q(packet);
-    copy_mac6(pack_ethh->dst, hismac);
-    copy_mac6(pack_ethh->src, nexthop);
-    pack_ethh->prot = htons(prot);
-    pack_ethh->tpid = htons(PKT_ETH_PROTO_8021Q);
-    pack_ethh->pcp_cfi_vid = conn->tag8021q;
-  } else
-#endif
-  {
-    struct pkt_ethhdr_t *pack_ethh = pkt_ethhdr(packet);
-    copy_mac6(pack_ethh->dst, hismac);
-    copy_mac6(pack_ethh->src, nexthop);
-    pack_ethh->prot = htons(prot);
-  }
+  struct pkt_ethhdr_t *pack_ethh = pkt_ethhdr(packet);
+  (void)conn;
+  copy_mac6(pack_ethh->dst, hismac);
+  copy_mac6(pack_ethh->src, nexthop);
+  pack_ethh->prot = htons(prot);
   return 0;
 }
 
@@ -4751,10 +4624,6 @@ int dhcp_data_req(struct dhcp_conn_t *conn,
   uint8_t *packet = pkt_buffer_head(pb);
   size_t length = pkt_buffer_length(pb);
 
-#ifdef ENABLE_IEEE8021Q
-  uint16_t tag = conn->tag8021q;
-#endif
-
   char do_checksum = 0;
   char allowed = 0;
 
@@ -4764,7 +4633,7 @@ int dhcp_data_req(struct dhcp_conn_t *conn,
     /*
      * Ethernet frame
      */
-    size_t hdrplus = sizeofeth2(tag) - sizeofeth(packet);
+    size_t hdrplus = PKT_ETH_HLEN - sizeofeth(packet);
     if (hdrplus > 0) {
       if (pb->offset < hdrplus) {
 	syslog(LOG_ERR, "bad buffer off=%d hdrplus=%d",
@@ -4776,7 +4645,7 @@ int dhcp_data_req(struct dhcp_conn_t *conn,
       length = pkt_buffer_length(pb);
     }
   } else {
-    size_t hdrlen = sizeofeth2(tag);
+    size_t hdrlen = PKT_ETH_HLEN;
     if (pb->offset < hdrlen) {
       syslog(LOG_ERR, "bad buffer off=%d hdr=%d",
              (int) pb->offset, (int) hdrlen);
@@ -4843,7 +4712,7 @@ int dhcp_data_req(struct dhcp_conn_t *conn,
 #ifdef ENABLE_IPV6
   if (_options.ipv6 && _options.ipv6only) {
     struct pkt_iphdr_t *iph =
-        (struct pkt_iphdr_t *)(packet + sizeofeth2(tag));
+        (struct pkt_iphdr_t *)(packet + PKT_ETH_HLEN);
 
     struct pkt_ethhdr_t *ethh;
 
@@ -4866,11 +4735,11 @@ int dhcp_data_req(struct dhcp_conn_t *conn,
     packet = pkt_buffer_head(pb);
     length = pkt_buffer_length(pb);
 
-    memcpy(packet, p, sizeofeth2(tag));
+    memcpy(packet, p, PKT_ETH_HLEN);
     ethh = pkt_ethhdr(packet);
     ethh->prot = htons(PKT_ETH_PROTO_IPv6);
 
-    ip6hdr = (struct pkt_ip6hdr_t *) (packet + sizeofeth2(tag));
+    ip6hdr = (struct pkt_ip6hdr_t *) (packet + PKT_ETH_HLEN);
     ip6hdr->ver_class_label = htonl(0x60000000);
     ip6hdr->data_len = htons(ntohs(iplen) - PKT_IP_HLEN);
     ip6hdr->next_header = prot;
@@ -5021,16 +4890,6 @@ int dhcp_receive_arp(struct dhcp_ctx *ctx, uint8_t *pack, size_t len) {
 
   OTHER_RECEIVED_LEN(conn, len-PKT_ETH_HLEN);
   dhcp_conn_set_idx(conn, ctx);
-
-#ifdef ENABLE_IEEE8021Q
-  if (_options.ieee8021q) {
-#if(_debug_ > 1)
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): calling dhcp_checktag", __FUNCTION__, __LINE__);
-#endif
-    dhcp_checktag(conn, pack);
-  }
-#endif
 
   if (_options.debug)
     syslog(LOG_DEBUG, "%s(%d): ARP: "MAC_FMT" asking about %s", __FUNCTION__, __LINE__,
@@ -5253,16 +5112,6 @@ int dhcp_receive_eapol(struct dhcp_ctx *ctx, uint8_t *pack) {
     }
 
     dhcp_conn_set_idx(conn, ctx);
-
-#ifdef ENABLE_IEEE8021Q
-    if (_options.ieee8021q) {
-#if(_debug_ > 1)
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s calling dhcp_checktag", __FUNCTION__);
-#endif
-      dhcp_checktag(conn, pack);
-    }
-#endif
 
     memset(&p, 0, sizeof(p));
     dhcp_ethhdr(conn, p, pack_ethh->src,

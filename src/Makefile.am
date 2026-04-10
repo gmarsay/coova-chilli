@@ -1,5 +1,7 @@
 AUTOMAKE_OPTIONS=foreign subdir-objects
 
+CLEANFILES = cmdline.stamp
+
 SUBDIRS = 
 EXTRA_DIST = cmdline.ggo cmdline.patch \
 linux/Makefile linux/xt_coova.c linux/xt_coova.h \
@@ -37,13 +39,13 @@ chilli_response_SOURCES = main-response.c
 chilli_query_SOURCES = main-query.c 
 chilli_opt_SOURCES = main-opt.c cmdline.c
 
-libchilli_la_LIBADD = $(BSTRING_LIBS) $(top_builddir)/json/libjson.la
+libchilli_la_LIBADD = $(BSTRING_LIBS) $(STRLCPY_LIBS) $(top_builddir)/json/libjson.la
 
 if WITH_OPENSSL
 libchilli_la_LIBADD += ${LIBSSL}
 endif
 
-LDADD = libchilli.la ${LIBRT} $(BSTRING_LIBS) ${LIBJSON} \
+LDADD = libchilli.la ${LIBRT} $(BSTRING_LIBS) $(STRLCPY_LIBS) ${LIBJSON} \
 	$(top_builddir)/json/libjson.la
 
 if WITH_OPENSSL
@@ -65,10 +67,6 @@ SUBDIRS += linux
 libchilli_la_SOURCES += kcoova.c
 endif
 
-if !HAVE_STRLCPY
-libchilli_la_SOURCES += ../extern/strlcpy.c
-endif
-
 install-exec-hook:
 	@for f in $(suid_programs); do \
 		echo "Setting SUID on $(DESTDIR)$(sbindir)/$$f !"; \
@@ -76,12 +74,15 @@ install-exec-hook:
 		chmod u+s $(DESTDIR)$(sbindir)/$$f; \
 	done
 
-main-opt.c: cmdline.c cmdline.h
+main-opt.c: cmdline.stamp
 
-cmdline.c cmdline.h: cmdline.ggo cmdline.patch
-	cat cmdline.ggo | gengetopt -C 
+cmdline.c cmdline.h: cmdline.stamp
+
+cmdline.stamp: cmdline.ggo cmdline.patch
+	cat cmdline.ggo | gengetopt -C
 	cp cmdline.c cmdline.c.orig
 	patch -p0 < cmdline.patch
+	touch cmdline.stamp
 
 cmdline.mini.gen: cmdline.ggo 
 	sh cmdline.mini.sh > cmdline.mini.gen

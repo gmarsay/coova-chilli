@@ -1252,14 +1252,6 @@ int chilli_req_attrs(struct radius_t *radius,
     radius_addattr(radius, pack, RADIUS_ATTR_ACCT_STATUS_TYPE, 0, 0,
 		   status_type, NULL, 0);
 
-#ifdef ENABLE_IEEE8021Q
-  if (_options.ieee8021q && state->tag8021q) {
-    radius_addattr(radius, pack, RADIUS_ATTR_VENDOR_SPECIFIC,
-		   RADIUS_VENDOR_COOVACHILLI, RADIUS_ATTR_COOVACHILLI_VLAN_ID,
-		   (uint32_t)ntohs(state->tag8021q & PKT_8021Q_MASK_VID), 0, 0);
-  }
-#endif
-
 #ifdef ENABLE_GARDENACCOUNTING
   switch(type) {
     case ACCT_GARDEN:
@@ -3970,28 +3962,16 @@ int chilli_getinfo(struct app_conn_t *appconn, bstring b, int fmt) {
         else
           bcatcstr(b, "-");
 
-#ifdef ENABLE_IEEE8021Q
-        /* adding: vlan, if one */
-        if (_options.ieee8021q && appconn->s_state.tag8021q) {
-          bassignformat(tmp, " vlan=%d",
-                        (int)ntohs(appconn->s_state.tag8021q &
-                                   PKT_8021Q_MASK_VID));
-          bconcat(b, tmp);
-        } else {
-#endif
 #ifdef ENABLE_MULTILAN
-          if (app_conn_idx(appconn)) {
-            bassignformat(tmp, " vlan=%s",
-                          _options.moreif[app_conn_idx(appconn)-1].vlan ?
-                          _options.moreif[app_conn_idx(appconn)-1].vlan :
-                          _options.moreif[app_conn_idx(appconn)-1].dhcpif);
-          } else {
-            bassignformat(tmp, " vlan=%s", _options.vlan);
-          }
-          bconcat(b, tmp);
-#endif
-#ifdef ENABLE_IEEE8021Q
+        if (app_conn_idx(appconn)) {
+          bassignformat(tmp, " vlan=%s",
+                        _options.moreif[app_conn_idx(appconn)-1].vlan ?
+                        _options.moreif[app_conn_idx(appconn)-1].vlan :
+                        _options.moreif[app_conn_idx(appconn)-1].dhcpif);
+        } else {
+          bassignformat(tmp, " vlan=%s", _options.vlan);
         }
+        bconcat(b, tmp);
 #endif
 
         bdestroy(tmp);

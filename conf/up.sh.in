@@ -55,16 +55,10 @@ run_up() {
 	    ipt_in -p udp --dst $ADDR --dport 53 -j ACCEPT
 	    ipt_in -p icmp --dst $ADDR -j ACCEPT
 
-	    if [ "$ONLY8021Q" != "1" ]
-	    then
-		ipt -I INPUT -i $DHCPIF -j DROP
-	    fi
+	    ipt -I INPUT -i $DHCPIF -j DROP
 
-	    if [ "$ONLY8021Q" != "1" ]
-	    then
-		ipt -I FORWARD -i $DHCPIF -j DROP
-		ipt -I FORWARD -o $DHCPIF -j DROP
-	    fi
+	    ipt -I FORWARD -i $DHCPIF -j DROP
+	    ipt -I FORWARD -o $DHCPIF -j DROP
 	    
 	    ipt -I FORWARD -i $TUNTAP -j ACCEPT
 	    ipt -I FORWARD -o $TUNTAP -j ACCEPT

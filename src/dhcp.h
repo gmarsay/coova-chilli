@@ -146,10 +146,6 @@ struct dhcp_conn_t {
   struct in_addr migrateip;    /* Client IP address to migrate to */
   /*time_t last_nak;*/
 
-#ifdef ENABLE_IEEE8021Q
-  uint16_t tag8021q;
-#endif
-
 #ifdef ENABLE_MULTILAN
 #define dhcp_conn_idx(x)       ((x)->lanidx)
 #define dhcp_conn_set_idx(x,c) ((x)->lanidx = (c)->idx)

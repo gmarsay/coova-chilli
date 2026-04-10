@@ -131,10 +131,6 @@ struct session_state {
   uint32_t session_state;
 #endif
 
-#ifdef ENABLE_IEEE8021Q
-  uint16_t tag8021q;
-#endif
-
 #ifdef ENABLE_MULTILAN
 #define app_conn_idx(x)       ((x)->s_state.lanidx)
 #define app_conn_set_idx(x,c) ((x)->s_state.lanidx = (c)->lanidx)

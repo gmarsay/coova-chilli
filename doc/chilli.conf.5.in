@@ -575,12 +575,6 @@ will listen for EAP authentication requests on the interface specified by
 EAP messages received on this interface are forwarded to the radius server.
 
 .TP
-.B ieee8021q
-Option to enable support for 802.1Q/VLAN network on the
-.B dhcpif
-interface. 
-
-.TP
 .BI uamserver " url"
 URL of web server to use for authenticating clients.
 

@@ -36,8 +36,8 @@
 #include "md5.h"
 #include "dns.h"
 
-#ifndef HAVE_STRLCPY
-extern size_t strlcpy(char *dst, const char *src, size_t dsize);
+#ifdef HAVE_LIBBSD_STRLCPY
+#include <bsd/string.h>
 #endif
 
 /*#define XXX_IO_DAEMON 1*/

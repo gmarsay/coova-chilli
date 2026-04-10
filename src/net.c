@@ -752,51 +752,16 @@ net_read_eth(net_interface *netif, void *d, size_t dlen) {
 
 #if defined(__linux__)
       struct sockaddr_ll s_addr;
-
-#if defined(HAVE_LINUX_TPACKET_AUXDATA_TP_VLAN_TCI)
-      struct iovec iov;
-      struct msghdr msg;
-      union {
-        struct cmsghdr cmsg;
-        char buf[CMSG_SPACE(sizeof(struct tpacket_auxdata))];
-      } cmsg_buf;
-#ifdef ENABLE_IEEE8021Q
-      struct cmsghdr *cmsg;
-      struct vlan_tag {
-        u_int16_t tpid;
-        u_int16_t tci;
-      };
-#endif
-      msg.msg_name = &s_addr;
-      msg.msg_namelen = sizeof(s_addr);
-      msg.msg_iov = &iov;
-      msg.msg_iovlen = 1;
-      msg.msg_control = &cmsg_buf;
-      msg.msg_controllen = sizeof(cmsg_buf);
-      msg.msg_flags = 0;
-
-      iov.iov_len = dlen;
-      iov.iov_base = d;
-#else
       int addr_len;
-#endif
 
-      memset (&s_addr, 0, sizeof (struct sockaddr_ll));
+      memset(&s_addr, 0, sizeof(s_addr));
 
-#if defined(HAVE_LINUX_TPACKET_AUXDATA_TP_VLAN_TCI)
-
-      len = safe_recvmsg(netif->fd, &msg, MSG_TRUNC);
-
-#else
-
-      addr_len = sizeof (s_addr);
+      addr_len = sizeof(s_addr);
 
       len = safe_recvfrom(netif->fd, d, dlen,
                           MSG_DONTWAIT | MSG_TRUNC,
                           (struct sockaddr *) &s_addr,
                           (socklen_t *) &addr_len);
-
-#endif
       if (len < 0) {
 
         syslog(LOG_ERR, "%s: could not read packet", strerror(errno));
@@ -805,7 +770,7 @@ net_read_eth(net_interface *netif, void *d, size_t dlen) {
 
         if (len == 0) {
           if (_options.debug)
-            syslog(LOG_DEBUG, "read zero, enable ieee8021q?");
+            syslog(LOG_DEBUG, "read zero from raw socket");
         }
 
         if (len > dlen) {
@@ -830,48 +795,6 @@ net_read_eth(net_interface *netif, void *d, size_t dlen) {
                errno, netif->fd, dlen, netif->mtu, len);
         return -1;
       }
-
-#if defined(HAVE_LINUX_TPACKET_AUXDATA_TP_VLAN_TCI) && defined(ENABLE_IEEE8021Q)
-      if (_options.ieee8021q) {
-        for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
-          struct tpacket_auxdata *aux;
-          struct vlan_tag *tag;
-          unsigned int ulen;
-
-          if (cmsg->cmsg_len < CMSG_LEN(sizeof(struct tpacket_auxdata)) ||
-              cmsg->cmsg_level != SOL_PACKET ||
-              cmsg->cmsg_type != PACKET_AUXDATA)
-            continue;
-
-          aux = (struct tpacket_auxdata *)CMSG_DATA(cmsg);
-          if (aux->tp_vlan_tci == 0)
-            continue;
-
-          ulen = len > iov.iov_len ? iov.iov_len : len;
-
-          if (ulen < 2 * PKT_ETH_ALEN ||
-              len >= (dlen - 4)) {
-            syslog(LOG_ERR, "bad pkt length to add 802.1q header %d/%zd",
-                   ulen, len);
-            break;
-          }
-
-#if(_debug_ > 1)
-          if (_options.debug)
-            syslog(LOG_DEBUG, "adding 8021q header from auxdata");
-#endif
-
-          memmove(d + (2 * PKT_ETH_ALEN) + 4,
-                  d + (2 * PKT_ETH_ALEN),
-                  len - (2 * PKT_ETH_ALEN));
-
-          tag = (struct vlan_tag *)(d + 2 * PKT_ETH_ALEN);
-          tag->tpid = htons(ETH_P_8021Q);
-          tag->tci = htons(aux->tp_vlan_tci);
-          len += 4;
-        }
-      }
-#endif
     }
 
   return len;
@@ -1411,14 +1334,6 @@ int net_open_eth(net_interface *netif) {
   netif->dest.sll_family = AF_PACKET;
   netif->dest.sll_protocol = htons(netif->protocol);
   netif->dest.sll_ifindex = netif->ifindex;
-#endif
-
-#if defined(HAVE_LINUX_TPACKET_AUXDATA_TP_VLAN_TCI)
-  option = 1;
-  if (setsockopt(netif->fd, SOL_PACKET, PACKET_AUXDATA, &option,
-		 sizeof(option)) == -1 && errno != ENOPROTOOPT) {
-    syslog(LOG_ERR, "%s: auxdata", strerror(errno));
-  }
 #endif
 
 #ifdef USING_MMAP

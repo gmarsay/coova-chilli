@@ -35,7 +35,7 @@ int ippool_print(int fd, struct ippool_t *this) {
   char * sep = "-- %-15s ------------------------------------------------------------\n";
 
 #define ERR 0
-#undef USED /* defined in <wolfssl/wolfcrypt/integer.h> */
+#undef USED /* may be defined by other headers */
 #define USED 1
 #define FREE 2
 #define LIST 3

@@ -63,7 +63,6 @@ AC_MSG_RESULT($V_DEV)
 case "$V_DEV" in
 linux)
 	AC_LBL_TPACKET_STATS
-	AC_LBL_LINUX_TPACKET_AUXDATA_TP_VLAN_TCI
 	;;
 esac
 
@@ -210,7 +209,20 @@ AM_CONDITIONAL([WITH_NETFILTER_COOVA], [test x"$with_nfcoova" != xno])
 
 AC_CHECK_LIB(rt, clock_gettime)
 
-AM_CONDITIONAL([HAVE_STRLCPY], [test "x$ac_cv_func_strlcpy" = xyes])
+dnl strlcpy: libc (glibc >= 2.38, musl, *BSD) or libbsd (e.g. libbsd-dev on Debian Bookworm).
+STRLCPY_LIBS=
+AS_IF([test "x$ac_cv_func_strlcpy" = xyes], [], [
+  libs_save=$LIBS
+  AC_CHECK_LIB([bsd], [strlcpy], [
+    STRLCPY_LIBS=-lbsd
+    AC_DEFINE([HAVE_STRLCPY], [1], [strlcpy is provided by libbsd])
+    AC_DEFINE([HAVE_LIBBSD_STRLCPY], [1], [Include bsd/string.h for strlcpy prototype])
+  ], [
+    AC_MSG_ERROR([strlcpy not found. Install libbsd-dev (Debian/Ubuntu) or use a libc that provides strlcpy (e.g. glibc >= 2.38).])
+  ], [])
+  LIBS=$libs_save
+])
+AC_SUBST([STRLCPY_LIBS])
 
 AC_SUBST(sysconfdir)
 AC_CONFIG_FILES([Makefile
@@ -218,7 +230,6 @@ AC_CONFIG_FILES([Makefile
 		 doc/Makefile
 		 json/Makefile
 		 src/Makefile
-		 src/mssl/Makefile
 		 www/Makefile])
 
 AC_OUTPUT

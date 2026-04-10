@@ -241,7 +241,6 @@ writeconfig() {
 	[ "$HS_ACCTUPDATE" = "on" ] && addconfig2 "acctupdate"
 	[ "$HS_DNSPARANOIA" = "on" ] && addconfig2 "dnsparanoia"
 	[ "$HS_UAMALLOWPOST" = "on" ] && addconfig2 "uamallowpost"
-	[ "$HS_IEEE8021Q" = "on" ] && addconfig2 "ieee8021q"
 	[ "$HS_UAMUISSL" = "on" ] && addconfig2 "uamuissl"
 	[ "$HS_REDIRSSL" = "on" ] && addconfig2 "redirssl"
 	[ "$HS_DHCPRADIUS" = "on" ] && addconfig2 "dhcpradius"

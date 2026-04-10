@@ -269,9 +269,6 @@ int options_fromfd(int fd, bstring bt) {
   if (!option_s_l(bt, &o.condown)) return 0;
   if (!option_s_l(bt, &o.macup)) return 0;
   if (!option_s_l(bt, &o.macdown)) return 0;
-#ifdef ENABLE_IEEE8021Q
-  if (!option_s_l(bt, &o.vlanupdate)) return 0;
-#endif
 #ifdef ENABLE_PROXYVSA
   if (!option_s_l(bt, &o.locationupdate)) return 0;
 #endif
@@ -416,9 +413,6 @@ int options_save(char *file, bstring bt) {
   if (!option_s_s(bt, &o.condown)) return 0;
   if (!option_s_s(bt, &o.macup)) return 0;
   if (!option_s_s(bt, &o.macdown)) return 0;
-#ifdef ENABLE_IEEE8021Q
-  if (!option_s_s(bt, &o.vlanupdate)) return 0;
-#endif
 #ifdef ENABLE_PROXYVSA
   if (!option_s_s(bt, &o.locationupdate)) return 0;
 #endif

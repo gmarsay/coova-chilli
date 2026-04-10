@@ -48,7 +48,6 @@ option "conup"       - "Script to run after user logon"  string no
 option "condown"     - "Script to run after user logoff" string no
 option "macup"       - "Script to run after initial DHCP"  string no
 option "macdown"     - "Script to run after DHCP release" string no
-option "vlanupdate"  - "Script to run after 802.1Q/VLAN id assignment" string no
 
 option "txqlen"      - "TX Queue length for tun interface (linux only)"  int default="100" no
 option "tundev"      - "TUN/TAP Device, as in tun0 or tap1" string no
@@ -162,8 +161,6 @@ option "nasmac"	     - "Unique MAC address of the NAS (called-station-id)" strin
 option "nasip"	     - "Unique IP address of the NAS (nas-ip-address)" string no
 option "ssid"	     - "SSID of the session" string no
 option "vlan"	     - "VLAN of the session" string no
-option "ieee8021q"   - "Support 802.1Q VLAN tagging" flag off
-option "only8021q"   - "Support 802.1Q VLAN tagged traffic only" flag off
 
 # Command Socket Support
 option "cmdsocket"   - "path to the command unix socket" string no

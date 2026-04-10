@@ -377,16 +377,6 @@ static void bstring_buildurl(bstring str, struct redir_conn_t *conn,
     bconcat(str, bt2);
   }
 
-#ifdef ENABLE_IEEE8021Q
-  if (_options.ieee8021q && conn->s_state.tag8021q) {
-    bcatcstr(str, amp);
-    bcatcstr(str, "vlan=");
-    bassignformat(bt, "%d",
-		  (int)ntohs(conn->s_state.tag8021q &
-			     PKT_8021Q_MASK_VID));
-    bconcat(str, bt);
-  } else
-#endif
 #ifdef ENABLE_MULTILAN
     if (conn->s_state.lanidx > 0) {
       bcatcstr(str, amp);

@@ -4,7 +4,7 @@
 FROM debian:bookworm
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     build-essential autoconf automake libtool pkg-config \
-    libssl-dev libjson-c-dev gengetopt \
+    libssl-dev libjson-c-dev libbsd-dev gengetopt \
     meson ninja-build git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

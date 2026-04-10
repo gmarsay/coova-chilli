@@ -54,9 +54,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_DHCPRADIUS
     "ENABLE_DHCPRADIUS "
 #endif
-#ifdef ENABLE_IEEE8021Q
-    "ENABLE_IEEE8021Q "
-#endif
 #ifdef ENABLE_IPV6
     "ENABLE_IPV6 "
 #endif
@@ -852,11 +849,6 @@ int main(int argc, char **argv) {
   _options.uamhostname = STRDUP(args_info.uamhostname_arg);
   _options.binconfig = STRDUP(args_info.bin_arg);
   _options.ethers = STRDUP(args_info.ethers_arg);
-#ifdef ENABLE_IEEE8021Q
-  _options.ieee8021q = args_info.ieee8021q_flag;
-  _options.ieee8021q_only = args_info.only8021q_flag;
-  _options.vlanupdate = STRDUP(args_info.vlanupdate_arg);
-#endif
   _options.nochallenge = args_info.nochallenge_flag;
 #ifdef EX_OPT_MAIN
 #include EX_OPT_MAIN
