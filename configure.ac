@@ -253,13 +253,6 @@ if test x"$enable_gardenext" = xyes; then
    AC_DEFINE(ENABLE_GARDENEXT,1,[Define to enable extended walled garden features])
 fi
 
-AC_ARG_ENABLE(inspect, [AS_HELP_STRING([--enable-inspect],[Enable inspect feature in cmdsock])], 
-  enable_inspect=$enableval, enable_inspect=no)
-
-if test x"$enable_inspect" = xyes; then
-   AC_DEFINE(ENABLE_INSPECT,1,[Define to enable inspect feature in cmdsock])
-fi
-
 AC_ARG_ENABLE(coa, [AS_HELP_STRING([--disable-coa],[Disable CoA RADIUS support])], 
   enable_coa=$enableval, enable_coa=yes)
 

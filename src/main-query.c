@@ -60,9 +60,6 @@ static cmd_info commands[] = {
 #endif
   { CMDSOCK_ADD_GARDEN,  "addgarden", NULL },
   { CMDSOCK_REM_GARDEN,  "remgarden", NULL },
-#ifdef ENABLE_INSPECT
-  { CMDSOCK_INSPECT,  "inspect", NULL },
-#endif
 #if defined(ENABLE_LOCATION) && defined(HAVE_AVL)
   { CMDSOCK_LISTLOC,       "listloc",       NULL },
   { CMDSOCK_LISTLOCSUM,    "listlocsum",    NULL },
@@ -459,9 +456,6 @@ int main(int argc, char **argv) {
 
       switch(request.type) {
 
-#ifdef ENABLE_INSPECT
-        case CMDSOCK_INSPECT:
-#endif
 #if defined(ENABLE_LOCATION) && defined(HAVE_AVL)
         case CMDSOCK_LISTLOC:
         case CMDSOCK_LISTLOCSUM:
