@@ -47,11 +47,6 @@ static int *p_reload_config = 0;
 /*static int do_timeouts = 1;*/
 static int do_interval = 0;
 
-#ifdef ENABLE_UAMANYIP
-/* some IPv4LL/APIPA(rfc 3927) specific stuff for uamanyip */
-struct in_addr ipv4ll_ip;
-struct in_addr ipv4ll_mask;
-#endif
 #ifdef ENABLE_SSDP
 #define SSDP_MCAST_ADDR ("239.255.255.250")
 #define SSDP_PORT 1900
@@ -1505,138 +1500,6 @@ int static auth_radius(struct app_conn_t *appconn,
 }
 
 
-#ifdef ENABLE_RADPROXY
-/*********************************************************
- * radius proxy functions
- * Used to send a response to a received radius request
- *********************************************************/
-
-/* Reply with an access reject */
-int static radius_access_reject(struct app_conn_t *conn) {
-  struct radius_packet_t radius_pack;
-
-  conn->radiuswait = 0;
-
-  if (radius_default_pack(radius, &radius_pack, RADIUS_CODE_ACCESS_REJECT)) {
-    syslog(LOG_ERR, "radius_default_pack() failed");
-    return -1;
-  }
-
-  radius_pack.id = conn->radiusid;
-  radius_resp(radius, &radius_pack, &conn->radiuspeer, conn->authenticator);
-  return 0;
-}
-
-/* Reply with an access challenge */
-int static radius_access_challenge(struct app_conn_t *conn) {
-  struct radius_packet_t radius_pack;
-  size_t offset = 0;
-  size_t eaplen = 0;
-
-  if (_options.debug)
-    syslog(LOG_DEBUG, "%s(%d): Sending RADIUS AccessChallenge to client", __FUNCTION__, __LINE__);
-
-  conn->radiuswait = 0;
-
-  if (radius_default_pack(radius, &radius_pack, RADIUS_CODE_ACCESS_CHALLENGE)) {
-    syslog(LOG_ERR, "radius_default_pack() failed");
-    return -1;
-  }
-
-  radius_pack.id = conn->radiusid;
-
-  /* Include EAP */
-  do {
-    if ((conn->challen - offset) > RADIUS_ATTR_VLEN)
-      eaplen = RADIUS_ATTR_VLEN;
-    else
-      eaplen = conn->challen - offset;
-
-    if (radius_addattr(radius, &radius_pack, RADIUS_ATTR_EAP_MESSAGE, 0, 0, 0,
-		       conn->chal + offset, eaplen)) {
-      syslog(LOG_ERR, "radius_default_pack() failed");
-      return -1;
-    }
-    offset += eaplen;
-  }
-  while (offset < conn->challen);
-
-  if (conn->s_state.redir.statelen) {
-    radius_addattr(radius, &radius_pack, RADIUS_ATTR_STATE, 0, 0, 0,
-		   conn->s_state.redir.statebuf,
-		   conn->s_state.redir.statelen);
-  }
-
-  radius_addattr(radius, &radius_pack, RADIUS_ATTR_MESSAGE_AUTHENTICATOR,
-		 0, 0, 0, NULL, RADIUS_MD5LEN);
-
-  radius_resp(radius, &radius_pack, &conn->radiuspeer, conn->authenticator);
-  return 0;
-}
-
-/* Send off an access accept */
-
-int static radius_access_accept(struct app_conn_t *conn) {
-  struct radius_packet_t radius_pack;
-  size_t offset = 0;
-  size_t eaplen = 0;
-
-  uint8_t mppekey[RADIUS_ATTR_VLEN];
-  size_t mppelen;
-
-  conn->radiuswait = 0;
-
-  if (radius_default_pack(radius, &radius_pack, RADIUS_CODE_ACCESS_ACCEPT)) {
-    syslog(LOG_ERR, "radius_default_pack() failed");
-    return -1;
-  }
-
-  radius_pack.id = conn->radiusid;
-
-  /* Include EAP (if present) */
-  offset = 0;
-  while (offset < conn->challen) {
-    if ((conn->challen - offset) > RADIUS_ATTR_VLEN)
-      eaplen = RADIUS_ATTR_VLEN;
-    else
-      eaplen = conn->challen - offset;
-
-    radius_addattr(radius, &radius_pack, RADIUS_ATTR_EAP_MESSAGE, 0, 0, 0,
-		   conn->chal + offset, eaplen);
-
-    offset += eaplen;
-  }
-
-  if (conn->sendlen) {
-    radius_keyencode(radius, mppekey, RADIUS_ATTR_VLEN,
-		     &mppelen, conn->sendkey,
-		     conn->sendlen, conn->authenticator,
-		     radius->proxysecret, radius->proxysecretlen);
-
-    radius_addattr(radius, &radius_pack, RADIUS_ATTR_VENDOR_SPECIFIC,
-		   RADIUS_VENDOR_MS, RADIUS_ATTR_MS_MPPE_SEND_KEY, 0,
-		   (uint8_t *)mppekey, mppelen);
-  }
-
-  if (conn->recvlen) {
-    radius_keyencode(radius, mppekey, RADIUS_ATTR_VLEN,
-		     &mppelen, conn->recvkey,
-		     conn->recvlen, conn->authenticator,
-		     radius->proxysecret, radius->proxysecretlen);
-
-    radius_addattr(radius, &radius_pack, RADIUS_ATTR_VENDOR_SPECIFIC,
-		   RADIUS_VENDOR_MS, RADIUS_ATTR_MS_MPPE_RECV_KEY, 0,
-		   (uint8_t *)mppekey, mppelen);
-  }
-
-  radius_addattr(radius, &radius_pack, RADIUS_ATTR_MESSAGE_AUTHENTICATOR,
-		 0, 0, 0, NULL, RADIUS_MD5LEN);
-
-  radius_resp(radius, &radius_pack, &conn->radiuspeer, conn->authenticator);
-  return 0;
-}
-#endif
-
 /*********************************************************
  * radius accounting functions
  * Used to send accounting request to radius server
@@ -1998,11 +1861,6 @@ int dnprot_reject(struct app_conn_t *appconn) {
         syslog(LOG_DEBUG, "%s(%d): Rejecting UAM", __FUNCTION__, __LINE__);
       return 0;
 
-#ifdef ENABLE_RADPROXY
-    case DNPROT_WPA:
-      return radius_access_reject(appconn);
-#endif
-
     case DNPROT_MAC:
       /* remove the username since we're not logged in */
       if (!appconn->s_state.authenticated)
@@ -2033,7 +1891,6 @@ int dnprot_reject(struct app_conn_t *appconn) {
   }
 }
 
-#if defined(ENABLE_RADPROXY) || defined(ENABLE_EAPOL)
 int static dnprot_challenge(struct app_conn_t *appconn) {
 
   switch (appconn->dnprot) {
@@ -2057,19 +1914,12 @@ int static dnprot_challenge(struct app_conn_t *appconn) {
     case DNPROT_MAC:
       break;
 
-#ifdef ENABLE_RADPROXY
-    case DNPROT_WPA:
-      radius_access_challenge(appconn);
-      break;
-#endif
-
     default:
       syslog(LOG_ERR, "Unknown downlink protocol");
   }
 
   return 0;
 }
-#endif
 
 int dnprot_accept(struct app_conn_t *appconn) {
   struct dhcp_conn_t* dhcpconn = NULL;
@@ -2122,7 +1972,6 @@ int dnprot_accept(struct app_conn_t *appconn) {
       appconn->s_params.flags &= ~REQUIRE_UAM_AUTH;
       break;
 
-#ifdef ENABLE_RADPROXY
     case DNPROT_WPA:
       if (!(dhcpconn = (struct dhcp_conn_t *)appconn->dnlink)) {
         syslog(LOG_ERR, "No downlink protocol");
@@ -2143,11 +1992,7 @@ int dnprot_accept(struct app_conn_t *appconn) {
         dhcpconn->authstate = DHCP_AUTH_PASS;
       }
 
-      /* Tell access point it was successful */
-      radius_access_accept(appconn);
-
       break;
-#endif
 
     case DNPROT_MAC:
       if (!(dhcpconn = (struct dhcp_conn_t *)appconn->dnlink)) {
@@ -2714,561 +2559,6 @@ chilli_proxy_radlocation(struct radius_packet_t *pack,
 }
 #endif
 
-/* Handle an accounting request */
-int accounting_request(struct radius_packet_t *pack,
-		       struct sockaddr_in *peer) {
-  struct radius_attr_t *attr = NULL;
-  struct radius_attr_t *hismacattr = NULL;
-  struct radius_attr_t *nasipattr = NULL;
-  struct radius_attr_t *nasportattr = NULL;
-  struct radius_packet_t radius_pack;
-  struct app_conn_t *appconn = NULL;
-  struct dhcp_conn_t *dhcpconn = NULL;
-  uint8_t hismac[PKT_ETH_ALEN];
-  char macstr[RADIUS_ATTR_VLEN];
-  size_t macstrlen;
-  unsigned int temp[PKT_ETH_ALEN];
-  uint32_t nasip = 0;
-  uint32_t nasport = 0;
-  int status_type;
-  int i;
-
-  if (radius_default_pack(radius, &radius_pack,
-			  RADIUS_CODE_ACCOUNTING_RESPONSE)) {
-    syslog(LOG_ERR, "radius_default_pack() failed");
-    return -1;
-  }
-
-  /* We will only respond, not proxy */
-  radius_pack.id = pack->id;
-
-  /* Status type */
-  if (radius_getattr(pack, &attr, RADIUS_ATTR_ACCT_STATUS_TYPE, 0, 0, 0)) {
-    syslog(LOG_ERR, "Status type is missing from radius request");
-    radius_resp(radius, &radius_pack, peer, pack->authenticator);
-    return 0;
-  }
-
-  status_type = ntohl(attr->v.i);
-
-  if (RADIUS_STATUS_TYPE_ACCOUNTING_ON  != status_type &&
-      RADIUS_STATUS_TYPE_ACCOUNTING_OFF != status_type) {
-
-    /* NAS IP */
-    if (!radius_getattr(pack, &nasipattr,
-			RADIUS_ATTR_NAS_IP_ADDRESS, 0, 0, 0)) {
-      if ((nasipattr->l-2) != sizeof(appconn->nasip)) {
-	syslog(LOG_ERR, "Wrong length of NAS IP address");
-	return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-      }
-      nasip = nasipattr->v.i;
-    }
-
-    /* NAS PORT */
-    if (!radius_getattr(pack, &nasportattr,
-			RADIUS_ATTR_NAS_PORT, 0, 0, 0)) {
-      if ((nasportattr->l-2) != sizeof(appconn->nasport)) {
-	syslog(LOG_ERR, "Wrong length of NAS port");
-	return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-      }
-      nasport = nasportattr->v.i;
-    }
-
-    /* Calling Station ID (MAC Address) */
-    if (!radius_getattr(pack, &hismacattr,
-			RADIUS_ATTR_CALLING_STATION_ID, 0, 0, 0)) {
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): Calling Station ID is: %.*s", __FUNCTION__, __LINE__,
-               hismacattr->l-2, hismacattr->v.t);
-
-      if ((macstrlen = (size_t)hismacattr->l-2) >= (RADIUS_ATTR_VLEN-1)) {
-	syslog(LOG_ERR, "Wrong length of called station ID");
-	return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-      }
-
-      memcpy(macstr, hismacattr->v.t, macstrlen);
-      macstr[macstrlen] = 0;
-
-      /* Replace anything but hex with space */
-      for (i=0; i<macstrlen; i++)
-	if (!isxdigit((int) macstr[i]))
-	  macstr[i] = 0x20;
-
-      if (sscanf (macstr, "%2x %2x %2x %2x %2x %2x",
-		  &temp[0], &temp[1], &temp[2],
-		  &temp[3], &temp[4], &temp[5]) != 6) {
-	syslog(LOG_ERR, "Failed to convert Calling Station ID to MAC Address");
-	return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-      }
-
-      for (i = 0; i < PKT_ETH_ALEN; i++)
-	hismac[i] = temp[i];
-    }
-
-    if (hismacattr) {
-      /*
-       * Look for mac address.
-       * If not found allocate new..
-       */
-	if (dhcp_hashget(dhcp, &dhcpconn, hismac)) {
-	  if (dhcp_newconn(dhcp, &dhcpconn, hismac)) {
-	    syslog(LOG_ERR, "Out of connections");
-	    return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-	  }
-	}
-	if (!(dhcpconn->peer)) {
-	  syslog(LOG_ERR, "No peer protocol defined");
-	  return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-	}
-	appconn = (struct app_conn_t *)dhcpconn->peer;
-    }
-    else if (nasipattr && nasportattr) { /* Look for NAS IP / Port */
-      if (chilli_getconn(&appconn, 0, nasip, nasport)) {
-	syslog(LOG_ERR, "Unknown connection");
-	radius_resp(radius, &radius_pack, peer, pack->authenticator);
-	return 0;
-      }
-    }
-    else {
-      syslog(LOG_ERR, "Calling Station ID or NAS IP/Port is missing from radius request");
-      radius_resp(radius, &radius_pack, peer, pack->authenticator);
-      return 0;
-    }
-
-    if (!appconn) {
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): No application context for RADIUS proxy", __FUNCTION__, __LINE__);
-      return 0;
-    }
-
-    /* Silently ignore radius request if allready processing one */
-    if (appconn->radiuswait) {
-      if (appconn->radiuswait == 2) {
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): Giving up on previous packet.. not dropping this one", __FUNCTION__, __LINE__);
-	appconn->radiuswait = 0;
-      } else {
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): Dropping RADIUS while waiting", __FUNCTION__, __LINE__);
-	appconn->radiuswait++;
-	return 0;
-      }
-    }
-
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): Handing RADIUS accounting proxy packet", __FUNCTION__, __LINE__);
-
-    dhcpconn = (struct dhcp_conn_t*) appconn->dnlink;
-
-#ifdef ENABLE_APSESSIONID
-    if (!radius_getattr(pack, &attr,
-			RADIUS_ATTR_ACCT_SESSION_ID, 0, 0, 0)) {
-      int len = attr->l-2;
-      if (len >= sizeof(appconn->s_state.ap_sessionid))
-	len = sizeof(appconn->s_state.ap_sessionid) - 1;
-      memcpy(appconn->s_state.ap_sessionid, attr->v.t, len);
-      appconn->s_state.ap_sessionid[len]=0;
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): AP Acct-Session-ID is: %s", __FUNCTION__, __LINE__,
-               appconn->s_state.ap_sessionid);
-    }
-#endif
-
-#ifdef ENABLE_PROXYVSA
-    switch (status_type) {
-      case RADIUS_STATUS_TYPE_START:
-        if (chilli_proxy_radlocation(pack, appconn, 1))
-          return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-        break;
-      case RADIUS_STATUS_TYPE_INTERIM_UPDATE:
-      case RADIUS_STATUS_TYPE_STOP:
-        if (chilli_proxy_radlocation(pack, appconn, 0))
-          return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-        break;
-    }
-#endif
-
-    /* -- This needs to be optional --
-       case RADIUS_STATUS_TYPE_STOP:
-       if (!dhcpconn) {
-       syslog(LOG_ERR,"No downlink protocol defined for RADIUS proxy client");
-       return 0;
-       }
-       dhcp_freeconn(dhcpconn, RADIUS_TERMINATE_CAUSE_LOST_CARRIER);
-       break;
-    */
-  }
-
-  if (_options.proxyonacct) {
-    /*
-     *  Drop the in-coming packet through to the chilli
-     *  RADIUS queue.
-     */
-    struct radius_packet_t acct_pack;
-    if (!radius_default_pack(radius, &acct_pack,
-			     RADIUS_CODE_ACCOUNTING_REQUEST)) {
-      size_t len = ntohs(pack->length) - RADIUS_HDRSIZE;
-      memcpy(acct_pack.payload, pack->payload, len);
-      acct_pack.length = htons(len + RADIUS_HDRSIZE);
-      radius_req(radius, &acct_pack, appconn);
-    }
-  }
-
-  radius_resp(radius, &radius_pack, peer, pack->authenticator);
-  return 0;
-}
-
-int access_request(struct radius_packet_t *pack,
-		   struct sockaddr_in *peer) {
-  struct radius_packet_t radius_pack;
-
-  struct ippoolm_t *ipm = NULL;
-
-  struct radius_attr_t *hisipattr = NULL;
-  struct radius_attr_t *nasipattr = NULL;
-  struct radius_attr_t *nasportattr = NULL;
-  struct radius_attr_t *hismacattr = NULL;
-  struct radius_attr_t *uidattr = NULL;
-  struct radius_attr_t *pwdattr = NULL;
-  struct radius_attr_t *eapattr = NULL;
-
-  struct in_addr hisip;
-  char pwd[RADIUS_ATTR_VLEN];
-  size_t pwdlen;
-  uint8_t hismac[PKT_ETH_ALEN];
-  char macstr[RADIUS_ATTR_VLEN];
-  size_t macstrlen;
-  unsigned int temp[PKT_ETH_ALEN];
-  int i;
-
-  struct app_conn_t *appconn = NULL;
-  struct dhcp_conn_t *dhcpconn = NULL;
-
-  uint8_t resp[MAX_EAP_LEN];     /* EAP response */
-  size_t resplen;                /* Length of EAP response */
-
-  size_t offset = 0;
-  size_t eaplen = 0;
-  int instance = 0;
-  uint8_t qid;
-
-  if (_options.debug)
-    syslog(LOG_DEBUG, "%s(%d): RADIUS Access-Request received", __FUNCTION__, __LINE__);
-
-  if (radius_default_pack(radius, &radius_pack, RADIUS_CODE_ACCESS_REJECT)) {
-    syslog(LOG_ERR, "radius_default_pack() failed");
-    return -1;
-  }
-
-  /* result of qnext */
-  qid = radius_pack.id;
-
-  /* keep in case of reject */
-  radius_pack.id = pack->id;
-
-  /*
-   *  User is identified by either IP address OR MAC address
-   */
-
-  /* Framed IP address (Conditional) */
-  if (!radius_getattr(pack, &hisipattr,
-		      RADIUS_ATTR_FRAMED_IP_ADDRESS, 0, 0, 0)) {
-    if ((hisipattr->l-2) != sizeof(hisip.s_addr)) {
-      syslog(LOG_ERR, "Wrong length of framed IP address");
-      return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-    }
-    hisip.s_addr = hisipattr->v.i;
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): Framed IP address is: %s", __FUNCTION__, __LINE__, inet_ntoa(hisip));
-  }
-
-  /* Calling Station ID: MAC Address (Conditional) */
-  if (!radius_getattr(pack, &hismacattr,
-		      RADIUS_ATTR_CALLING_STATION_ID, 0, 0, 0)) {
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): Calling Station ID is: %.*s", __FUNCTION__, __LINE__, hismacattr->l-2, hismacattr->v.t);
-
-    if ((macstrlen = (size_t)hismacattr->l-2) >= (RADIUS_ATTR_VLEN-1)) {
-      syslog(LOG_ERR, "Wrong length of calling station ID");
-      return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-    }
-
-    memcpy(macstr, hismacattr->v.t, macstrlen);
-    macstr[macstrlen] = 0;
-
-    /* Replace anything but hex with space */
-    for (i=0; i<macstrlen; i++)
-      if (!isxdigit((int) macstr[i]))
-	macstr[i] = 0x20;
-
-    if (sscanf (macstr, "%2x %2x %2x %2x %2x %2x",
-		&temp[0], &temp[1], &temp[2],
-		&temp[3], &temp[4], &temp[5]) != 6) {
-      syslog(LOG_ERR, "Failed to convert Calling Station ID to MAC Address");
-      return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-    }
-
-    for (i = 0; i < PKT_ETH_ALEN; i++)
-      hismac[i] = temp[i];
-  }
-
-  /* Framed IP address or MAC Address must be given in request */
-  if ((!hisipattr) && (!hismacattr)) {
-    syslog(LOG_ERR, "Framed IP address or Calling Station ID is missing from radius request");
-    return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-  }
-
-  /* Username (Mandatory) */
-  if (radius_getattr(pack, &uidattr, RADIUS_ATTR_USER_NAME, 0, 0, 0)) {
-    syslog(LOG_ERR, "User-Name is missing from radius request");
-    return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-  }
-
-  if (hisipattr) { /* Find user based on IP address */
-    if (ippool_getip(ippool, &ipm, &hisip)) {
-      syslog(LOG_ERR, "RADIUS-Request: IP Address not found");
-      return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-    }
-
-    if ((appconn  = (struct app_conn_t *)ipm->peer)        == NULL ||
-	(dhcpconn = (struct dhcp_conn_t *)appconn->dnlink) == NULL) {
-      syslog(LOG_ERR, "RADIUS-Request: No peer protocol defined");
-      return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-    }
-  }
-  else if (hismacattr) {
-    /*
-     * Look for mac address.
-     * If not found allocate new..
-     */
-      if (dhcp_hashget(dhcp, &dhcpconn, hismac)) {
-	if (dhcp_newconn(dhcp, &dhcpconn, hismac)) {
-	  syslog(LOG_ERR, "Out of connections");
-	  return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-	}
-      }
-      if (!(dhcpconn->peer)) {
-	syslog(LOG_ERR, "No peer protocol defined");
-	return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-      }
-      appconn = (struct app_conn_t *)dhcpconn->peer;
-  }
-  else {
-    syslog(LOG_ERR, "Framed-IP-Address or Calling-Station-ID required in RADIUS request");
-    return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-  }
-
-  /* Silently ignore radius request if already processing one */
-  if (appconn->radiuswait) {
-    if (appconn->radiuswait == 2) {
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): Giving up on previous packet.. not dropping this one", __FUNCTION__, __LINE__);
-      appconn->radiuswait = 0;
-    } else {
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): Dropping RADIUS while waiting", __FUNCTION__, __LINE__);
-      appconn->radiuswait++;
-      return 0;
-    }
-  }
-
-  dhcpconn->lasttime = mainclock_now();
-
-  /* Password */
-  if (!radius_getattr(pack, &pwdattr, RADIUS_ATTR_USER_PASSWORD, 0, 0, 0)) {
-    if (radius_pwdecode(radius, (uint8_t*) pwd, RADIUS_ATTR_VLEN, &pwdlen,
-			pwdattr->v.t, pwdattr->l-2, pack->authenticator,
-			radius->proxysecret,
-			radius->proxysecretlen)) {
-      syslog(LOG_ERR, "radius_pwdecode() failed");
-      return -1;
-    }
-#if(_debug_)
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): Password is: %s", __FUNCTION__, __LINE__, pwd);
-#endif
-  }
-
-  /* Get EAP message */
-  resplen = 0;
-  do {
-    eapattr=NULL;
-    if (!radius_getattr(pack, &eapattr, RADIUS_ATTR_EAP_MESSAGE, 0, 0,
-			instance++)) {
-      if ((resplen + (size_t)eapattr->l-2) > MAX_EAP_LEN) {
-	syslog(LOG_INFO, "EAP message too long %zu %d", resplen, (int)eapattr->l-2);
-	return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-      }
-      memcpy(resp + resplen, eapattr->v.t, (size_t)eapattr->l-2);
-      resplen += (size_t)eapattr->l-2;
-    }
-  } while (eapattr);
-
-  if (resplen) {
-    appconn->dnprot = DNPROT_WPA;
-  }
-
-#ifdef ENABLE_PROXYVSA
-  if (chilli_proxy_radlocation(pack, appconn, 1))
-    return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-#endif
-
-  /* Passwd or EAP must be given in request */
-  if ((!pwdattr) && (!resplen)) {
-    syslog(LOG_ERR, "Password or EAP message is missing from radius request");
-    return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-  }
-
-#ifdef ENABLE_RADPROXY
-  if (_options.proxymacaccept && !resplen) {
-    syslog(LOG_INFO, "Accepting MAC login");
-    radius_pack.code = RADIUS_CODE_ACCESS_ACCEPT;
-    return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-  }
-#endif
-
-  /* CoovaChilli Notes:
-     Dublicate logins should be allowed as it might be the terminal
-     moving from one access point to another. It is however
-     unacceptable to login with another username on top of an allready
-     existing connection
-
-     TODO: New username should be allowed, but should result in
-     a accounting stop message for the old connection.
-     this does however pose a denial of service attack possibility
-
-     If allready logged in send back accept message with username
-     TODO ? Should this be a reject: Dont login twice ?
-  */
-
-  /* Terminate previous session if trying to login with another username */
-  if ((appconn->s_state.authenticated == 1) &&
-      ((strlen(appconn->s_state.redir.username) != uidattr->l-2) ||
-       (memcmp(appconn->s_state.redir.username, uidattr->v.t, uidattr->l-2)))) {
-    terminate_appconn(appconn, RADIUS_TERMINATE_CAUSE_USER_REQUEST);
-    if (radius_default_pack(radius, &radius_pack, RADIUS_CODE_ACCESS_REJECT)) {
-      syslog(LOG_ERR, "radius_default_pack() failed");
-      return -1;
-    }
-  }
-
-  /* NAS IP */
-  if (!radius_getattr(pack, &nasipattr, RADIUS_ATTR_NAS_IP_ADDRESS, 0, 0, 0)) {
-    if ((nasipattr->l-2) != sizeof(appconn->nasip)) {
-      syslog(LOG_ERR, "Wrong length of NAS IP address");
-      return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-    }
-    appconn->nasip = nasipattr->v.i;
-  }
-
-  /* NAS PORT */
-  if (!radius_getattr(pack, &nasportattr, RADIUS_ATTR_NAS_PORT, 0, 0, 0)) {
-    if ((nasportattr->l-2) != sizeof(appconn->nasport)) {
-      syslog(LOG_ERR, "Wrong length of NAS port");
-      return radius_resp(radius, &radius_pack, peer, pack->authenticator);
-    }
-    appconn->nasport = nasportattr->v.i;
-  }
-
-  /* Store parameters for later use */
-  if (uidattr->l-2 < USERNAMESIZE) {
-    memcpy(appconn->s_state.redir.username,
-	   (char *)uidattr->v.t, uidattr->l-2);
-    appconn->s_state.redir.username[uidattr->l-2]=0;
-  }
-
-
-  appconn->radiuswait = 1;
-  appconn->radiusid = pack->id;
-
-  if (pwdattr)
-    appconn->authtype = PAP_PASSWORD;
-  else
-    appconn->authtype = EAP_MESSAGE;
-
-  memcpy(&appconn->radiuspeer, peer, sizeof(*peer));
-  memcpy(appconn->authenticator, pack->authenticator, RADIUS_AUTHLEN);
-  memcpy(appconn->hismac, dhcpconn->hismac, PKT_ETH_ALEN);
-
-  /* Build up radius request */
-  radius_pack.code = RADIUS_CODE_ACCESS_REQUEST;
-
-  radius_addattr(radius, &radius_pack, RADIUS_ATTR_USER_NAME, 0, 0, 0,
-		 uidattr->v.t, uidattr->l - 2);
-
-  if (appconn->s_state.redir.statelen) {
-    radius_addattr(radius, &radius_pack, RADIUS_ATTR_STATE, 0, 0, 0,
-		   appconn->s_state.redir.statebuf,
-		   appconn->s_state.redir.statelen);
-  }
-
-  if (pwdattr)
-    radius_addattr(radius, &radius_pack, RADIUS_ATTR_USER_PASSWORD, 0, 0, 0,
-		   (uint8_t*) pwd, pwdlen);
-
-  /* Include EAP (if present) */
-  offset = 0;
-  while (offset < resplen) {
-
-    if ((resplen - offset) > RADIUS_ATTR_VLEN)
-      eaplen = RADIUS_ATTR_VLEN;
-    else
-      eaplen = resplen - offset;
-
-    radius_addattr(radius, &radius_pack, RADIUS_ATTR_EAP_MESSAGE, 0, 0, 0,
-		   resp + offset, eaplen);
-
-    offset += eaplen;
-  }
-
-  if (resplen) {
-    if (_options.wpaguests)
-      radius_addattr(radius, &radius_pack, RADIUS_ATTR_VENDOR_SPECIFIC,
-		     RADIUS_VENDOR_COOVACHILLI, RADIUS_ATTR_COOVACHILLI_CONFIG,
-		     0, (uint8_t*)"allow-wpa-guests", 16);
-  }
-
-  chilli_req_attrs(radius, &radius_pack,
-		   ACCT_USER,
-		   _options.framedservice ? RADIUS_SERVICE_TYPE_FRAMED :
-		   RADIUS_SERVICE_TYPE_LOGIN, 0,
-		   appconn->unit, appconn->hismac,
-		   &appconn->hisip, &appconn->s_state);
-
-  radius_addattr(radius, &radius_pack, RADIUS_ATTR_MESSAGE_AUTHENTICATOR,
-		 0, 0, 0, NULL, RADIUS_MD5LEN);
-
-  /* restore request id to that of queue */
-  radius_pack.id = qid;
-
-  return radius_req(radius, &radius_pack, appconn);
-}
-
-/*********************************************************
- *
- * radius proxy callback functions (request from radius server)
- *
- *********************************************************/
-
-/* Radius callback when radius request has been received */
-int cb_radius_ind(struct radius_t *rp, struct radius_packet_t *pack,
-		  struct sockaddr_in *peer) {
-
-  if (rp != radius) {
-    syslog(LOG_ERR, "Radius callback from unknown instance");
-    return 0;
-  }
-
-  switch (pack->code) {
-    case RADIUS_CODE_ACCOUNTING_REQUEST:
-      return accounting_request(pack, peer);
-    case RADIUS_CODE_ACCESS_REQUEST:
-      return access_request(pack, peer);
-    default:
-      syslog(LOG_ERR, "Unsupported radius request received: %d", pack->code);
-      return 0;
-  }
-}
 
 static int
 session_disconnect(struct app_conn_t *appconn,
@@ -3780,12 +3070,10 @@ int cb_radius_auth_conf(struct radius_t *radius,
   struct radius_attr_t *classattr = NULL;
   struct radius_attr_t *uidattr = NULL;
 
-#ifdef ENABLE_RADPROXY
   int instance = 0;
   struct radius_attr_t *policyattr = NULL;
   struct radius_attr_t *typesattr = NULL;
   struct radius_attr_t *eapattr = NULL;
-#endif
 
   int force_ip = 0;
   struct in_addr hisip;
@@ -3806,12 +3094,10 @@ int cb_radius_auth_conf(struct radius_t *radius,
   appconn->s_state.redir.statelen = 0;
   hisip.s_addr = hismask.s_addr = 0;
 
-#ifdef ENABLE_RADPROXY
   appconn->challen  = 0;
   appconn->sendlen  = 0;
   appconn->recvlen  = 0;
   appconn->lmntlen  = 0;
-#endif
 
   if (!pack) { /* Timeout */
     syslog(LOG_ERR, "RADIUS request id=%d timed out for session %s",
@@ -3984,7 +3270,6 @@ int cb_radius_auth_conf(struct radius_t *radius,
     memcpy(appconn->s_state.redir.statebuf, stateattr->v.t, stateattr->l-2);
   }
 
-#ifdef ENABLE_RADPROXY
   /* ACCESS-CHALLENGE */
   if (pack->code == RADIUS_CODE_ACCESS_CHALLENGE) {
     if (_options.debug)
@@ -4012,7 +3297,6 @@ int cb_radius_auth_conf(struct radius_t *radius,
 
     return dnprot_challenge(appconn);
   }
-#endif
 
   /* ACCESS-ACCEPT */
   if (pack->code != RADIUS_CODE_ACCESS_ACCEPT) {
@@ -4062,8 +3346,8 @@ int cb_radius_auth_conf(struct radius_t *radius,
     }
   }
 
-#ifdef ENABLE_RADPROXY
   /* EAP Message */
+  instance = 0;
   appconn->challen = 0;
   do {
     eapattr=NULL;
@@ -4146,21 +3430,18 @@ int cb_radius_auth_conf(struct radius_t *radius,
     }
     memcpy(appconn->ms2succ, ((void*)&succattr->v.t)+3, MS2SUCCSIZE);
   }
-#endif
 
   switch(appconn->authtype) {
 
     case PAP_PASSWORD:
       break;
 
-#ifdef ENABLE_RADPROXY
     case EAP_MESSAGE:
       if (!appconn->challen) {
         syslog(LOG_INFO, "No EAP message found");
         return dnprot_reject(appconn);
       }
       break;
-#endif
 
     case CHAP_DIGEST_MD5:
       break;
@@ -5350,12 +4631,10 @@ int static uam_msg(struct redir_msg_t *msg) {
       appconn->s_params.routeidx = tun->routeidx;
       appconn->s_state.redir.statelen = 0;
 
-#ifdef ENABLE_RADPROXY
       appconn->challen  = 0;
       appconn->sendlen  = 0;
       appconn->recvlen  = 0;
       appconn->lmntlen  = 0;
-#endif
 
       memcpy(appconn->hismac, dhcpconn->hismac, PKT_ETH_ALEN);
 
@@ -6183,7 +5462,7 @@ int chilli_main(int argc, char **argv) {
     if (radius_new(&radius,
                    &_options.radiuslisten,
                    _options.coaport,
-                   _options.coanoipcheck, 1) ||
+                   _options.coanoipcheck) ||
         radius_init_q(radius, _options.radiusqsize)) {
       syslog(LOG_ERR, "Failed to create radius");
       return -1;
@@ -6195,9 +5474,6 @@ int chilli_main(int argc, char **argv) {
     radius_set_cb_auth_conf(radius, cb_radius_auth_conf);
 #ifdef ENABLE_COA
     radius_set_cb_coa_ind(radius, cb_radius_coa_ind);
-#endif
-#ifdef ENABLE_RADPROXY
-    radius_set_cb_ind(radius, cb_radius_ind);
 #endif
 
     if (_options.acct_update)
@@ -6344,12 +5620,6 @@ int chilli_main(int argc, char **argv) {
 
     net_select_reg(&sctx, radius->fd, SELECT_READ,
                    (select_callback)radius_decaps, radius, 0);
-
-#ifdef ENABLE_RADPROXY
-    if (radius->proxyfd)
-      net_select_reg(&sctx, radius->proxyfd, SELECT_READ,
-                     (select_callback)radius_proxy_ind, radius, 0);
-#endif
 
 #if defined(__linux__)
     net_select_reg(&sctx, dhcp->relayfd, SELECT_READ,

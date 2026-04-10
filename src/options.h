@@ -49,13 +49,6 @@ struct options_t {
   char * tundev;
   char * dynip;                  /* Dynamic IP address pool */
   char * statip;                 /* Static IP address pool */
-#ifdef ENABLE_UAMANYIP
-  int autostatip;                /* Automatically assign "Static" IP addresses */
-  struct in_addr uamnatanyipex_addr; /* Exclude a given subnet addres from uamnatanyip */
-  struct in_addr uamnatanyipex_mask; /* Exclude a given subnet mask from uamnatanyip */
-  struct in_addr uamanyipex_addr; /* Exclude a given subnet addres from uamanyip */
-  struct in_addr uamanyipex_mask; /* Exclude a given subnet mask from uamanyip */
-#endif
   struct in_addr dns1;           /* Primary DNS server IP address */
   struct in_addr dns2;           /* Secondary DNS server IP address */
   char * domain;                 /* Domain to use for DNS lookups */
@@ -69,12 +62,6 @@ struct options_t {
 
 #ifdef USING_MMAP
   int ringsize;
-#endif
-
-#ifdef ENABLE_IPV6
-  struct in6_addr dns1_v6;
-  struct in6_addr dns2_v6;
-  struct in6_addr v6prefix;
 #endif
 
   int sndbuf;
@@ -107,15 +94,6 @@ struct options_t {
   int radiustimeout;             /* Retry timeout in milli seconds */
   int radiusretry;               /* Total amount of retries */
   int radiusretrysec;            /* Amount of retries after we switch to secondary */
-
-#ifdef ENABLE_RADPROXY
-  /* Radius proxy parameters */
-  int proxyport;                 /* UDP port to listen to */
-  struct in_addr proxylisten;    /* IP address to listen to */
-  struct in_addr proxyaddr;      /* IP address of proxy client(s) */
-  struct in_addr proxymask;      /* IP mask of proxy client(s) */
-  char* proxysecret;             /* Proxy shared secret */
-#endif
 
   struct in_addr postauth_proxyip;  /* IP address to proxy http to */
   int postauth_proxyport;           /* TCP port to proxy to */
@@ -185,17 +163,11 @@ struct options_t {
   uint8_t dhcpusemac:1;             /* Use given MAC or interface default */
   uint8_t noc2c:1;
   uint8_t framedservice:1;
-  uint8_t usetap:1;
-  uint8_t noarpentries:1;
   uint8_t eapolenable:1;            /* Use eapol */
   uint8_t swapoctets:1;
   uint8_t pap_always_ok:1;          /* Obsolete */
   uint8_t mschapv2:1;               /* Use and support MSCHAPv2 */
   uint8_t uamanydns:1;              /* Allow any dns server */
-#ifdef ENABLE_UAMANYIP
-  uint8_t uamanyip:1;               /* Allow any ip address */
-  uint8_t uamnatanyip:1;            /* Provide NAT for Any IP clients */
-#endif
   uint8_t dnsparanoia:1;            /* Filter DNS for questionable content (dns tunnels) */
   uint8_t acct_update:1;            /* Allow for session parameter updates in accounting response */
   uint8_t wpaguests:1;              /* Allow WPS "Guest" access */
@@ -231,13 +203,6 @@ struct options_t {
   uint8_t mmapring:1;
 #endif
 
-#ifdef ENABLE_IPV6
-  uint8_t ipv6:1;
-  uint8_t ipv6only:1;
-  uint8_t ipv6to4:1;
-  uint8_t ipv4to6:1;
-#endif
-
 #ifdef ENABLE_LEAKYBUCKET
   uint8_t scalewin:1;
 #endif
@@ -252,14 +217,6 @@ struct options_t {
   uint8_t uamotherdata:1;
 #endif
 
-#ifdef ENABLE_IEEE8021Q
-  uint8_t ieee8021q:1;              /* check for VLAN tags */
-  uint8_t ieee8021q_only:1;              /* check for VLAN tags */
-#endif
-#ifdef ENABLE_RADPROXY
-  uint8_t proxymacaccept:1;         /* Auto-accept non-EAP requests on proxy port */
-  uint8_t proxyonacct:1;
-#endif
 #ifdef ENABLE_PROXYVSA
   uint8_t vlanlocation:1;
   uint8_t location_stop_start:1;
@@ -364,10 +321,6 @@ struct options_t {
   /* Command-Socket */
   char *cmdsocket;
   uint16_t cmdsocketport;
-
-#ifdef ENABLE_IEEE8021Q
-  char * vlanupdate;
-#endif
 
 #ifdef ENABLE_LEAKYBUCKET
   uint32_t bwbucketupsize;

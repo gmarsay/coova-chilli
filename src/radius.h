@@ -234,16 +234,6 @@ struct radius_t {
   int last;                      /* Last packet in queue (youngest timeout) */
 
 
-#ifdef ENABLE_RADPROXY
-  int proxyfd;                   /* Proxy socket file descriptor */
-  struct in_addr proxylisten;    /* Proxy address to listen to */
-  uint16_t proxyport;            /* Proxy port to listen to */
-  struct in_addr proxyaddr;      /* Proxy client address */
-  struct in_addr proxymask;      /* Proxy client mask */
-  char proxysecret[RADIUS_SECRETSIZE]; /* Proxy secret */
-  size_t proxysecretlen;            /* Length of sharet secret */
-#endif
-
   unsigned char nas_hwaddr[6];   /* Hardware address of NAS */
   int debug;                     /* Print debug messages */
 
@@ -261,7 +251,7 @@ struct radius_t {
 /* Create new radius instance */
 int radius_new(struct radius_t **this,
 	       struct in_addr *listen, uint16_t port,
-	       int coanocheck, int proxy);
+	       int coanocheck);
 
 int radius_printqueue(int fd, struct radius_t *this);
 
@@ -302,21 +292,10 @@ int radius_pkt_send(struct radius_t *this,
       struct radius_packet_t *pack,
       struct sockaddr_in *peer);
 
-#ifdef ENABLE_RADPROXY
-int radius_pkt_send_proxy(struct radius_t *this,
-      struct radius_packet_t *pack,
-      struct sockaddr_in *peer);
-#endif
-
 /* Send of a request */
 int radius_req(struct radius_t *this,
 	       struct radius_packet_t *pack,
 	       void *cbp);
-
-/* Send of a response */
-int radius_resp(struct radius_t *this,
-		struct radius_packet_t *pack,
-		struct sockaddr_in *peer, uint8_t *req_auth);
 
 /* Send of a coa response */
 int radius_coaresp(struct radius_t *this,
@@ -325,9 +304,6 @@ int radius_coaresp(struct radius_t *this,
 
 /* Process an incoming packet */
 int radius_decaps(struct radius_t *this, int idx);
-
-/* Process an incoming packet */
-int radius_proxy_ind(struct radius_t *this, int idx);
 
 /* Add an attribute to a packet */
 int radius_addattr(struct radius_t *this, struct radius_packet_t *pack,

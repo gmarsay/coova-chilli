@@ -283,9 +283,6 @@ int options_fromfd(int fd, bstring bt) {
 #endif
   if (!option_s_l(bt, &o.radiusnasid)) return 0;
   if (!option_s_l(bt, &o.locationname)) return 0;
-#ifdef ENABLE_RADPROXY
-  if (!option_s_l(bt, &o.proxysecret)) return 0;
-#endif
 
   if (!option_s_l(bt, &o.dhcpif)) return 0;
 #ifdef ENABLE_MULTILAN
@@ -435,9 +432,6 @@ int options_save(char *file, bstring bt) {
 
   if (!option_s_s(bt, &o.radiusnasid)) return 0;
   if (!option_s_s(bt, &o.locationname)) return 0;
-#ifdef ENABLE_RADPROXY
-  if (!option_s_s(bt, &o.proxysecret)) return 0;
-#endif
 
   if (!option_s_s(bt, &o.dhcpif)) return 0;
 #ifdef ENABLE_MULTILAN

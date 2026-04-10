@@ -1239,8 +1239,7 @@ int radius_pwencode(struct radius_t *this,
  */
 int radius_new(struct radius_t **this,
 	       struct in_addr *listen, uint16_t port,
-	       int coanocheck,
-	       int proxy) {
+	       int coanocheck) {
   struct sockaddr_in addr;
   struct radius_t *new_radius;
 
@@ -1255,36 +1254,6 @@ int radius_new(struct radius_t **this,
   /* Radius parameters */
   new_radius->ouraddr.s_addr = listen->s_addr;
   new_radius->ourport = port;
-
-#ifdef ENABLE_RADPROXY
-  if (proxy) {  /* Proxy parameters */
-    if (_options.proxyport && _options.proxysecret) {
-      new_radius->proxylisten.s_addr = _options.proxylisten.s_addr;
-      new_radius->proxyport = _options.proxyport;
-
-      if (_options.proxyaddr.s_addr) {
-	new_radius->proxyaddr.s_addr = _options.proxyaddr.s_addr;
-	if (_options.proxymask.s_addr)
-	  new_radius->proxymask.s_addr = _options.proxymask.s_addr;
-	else
-	  new_radius->proxyaddr.s_addr = ~0;
-      } else {
-	new_radius->proxyaddr.s_addr = ~0;
-	new_radius->proxymask.s_addr = 0;
-      }
-
-      if ((new_radius->proxysecretlen =
-	   strlen(_options.proxysecret)) < RADIUS_SECRETSIZE) {
-	memcpy(new_radius->proxysecret, _options.proxysecret,
-	       new_radius->proxysecretlen);
-      } else {
-	new_radius->proxysecretlen = 0;
-      }
-    } else {
-      proxy = 0;
-    }
-  }
-#endif
 
   /* Initialise queue */
   new_radius->queue = 0;
@@ -1322,36 +1291,6 @@ int radius_new(struct radius_t **this,
     free(new_radius);
     return -1;
   }
-
-#ifdef ENABLE_RADPROXY
-  if (proxy) {     /* Initialise proxy socket */
-
-    if ((new_radius->proxyfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
-      syslog(LOG_ERR, "%s: socket() failed for proxyfd!", strerror(errno));
-      fclose(new_radius->urandom_fp);
-      close(new_radius->fd);
-      free(new_radius);
-      return -1;
-    }
-
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr = new_radius->proxylisten;
-    addr.sin_port = htons(new_radius->proxyport);
-
-    if (bind(new_radius->proxyfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-      syslog(LOG_ERR, "%s: bind() failed for proxylisten!", strerror(errno));
-      fclose(new_radius->urandom_fp);
-      close(new_radius->fd);
-      close(new_radius->proxyfd);
-      free(new_radius);
-      return -1;
-    }
-  }
-  else {
-    new_radius->proxyfd = -1; /* Indicate that proxy is not used */
-  }
-#endif
 
   *this = new_radius;
   return 0;
@@ -1393,13 +1332,6 @@ radius_free(struct radius_t *this) {
   if (close(this->fd)) {
     syslog(LOG_ERR, "radius: %s: close(fd=%d) failed!", strerror(errno), fd);
   }
-#ifdef ENABLE_RADPROXY
-  fd = this->proxyfd;
-  if (this->proxyfd > 0 && close(this->proxyfd)) {
-     syslog(LOG_ERR, "radius: %s: close(proxyfd=%d) failed!", strerror(errno),
-            fd);
-  }
-#endif
   free(this);
   return 0;
 }
@@ -1522,27 +1454,6 @@ int radius_pkt_send(struct radius_t *this,
   return 0;
 }
 
-#ifdef ENABLE_RADPROXY
-/*
- * radius_pkt_send_proxy()
- * Send of a proxied response
- */
-int radius_pkt_send_proxy(struct radius_t *this,
-      struct radius_packet_t *pack,
-      struct sockaddr_in *peer) {
-
-  size_t len = ntohs(pack->length);
-
-  if (sendto(this->proxyfd, pack, len, 0,(struct sockaddr *) peer,
-       sizeof(struct sockaddr_in)) < 0) {
-    syslog(LOG_ERR, "%s: sendto() failed!", strerror(errno));
-    return -1;
-  }
-
-  return 0;
-}
-#endif
-
 /*
  * radius_req()
  * Send of a packet and place it in the retransmit queue
@@ -1583,34 +1494,6 @@ int radius_req(struct radius_t *this,
 
   return radius_pkt_send(this, pack, &addr);
 }
-
-#ifdef ENABLE_RADPROXY
-/*
- * radius_resp()
- * Send of a packet (no retransmit queue)
- */
-int radius_resp(struct radius_t *this,
-		struct radius_packet_t *pack,
-		struct sockaddr_in *peer, uint8_t *req_auth) {
-
-  struct radius_attr_t *ma = NULL; /* Message authenticator */
-
-  /* Prepare for message authenticator TODO */
-  memset(pack->authenticator, 0, RADIUS_AUTHLEN);
-  memcpy(pack->authenticator, req_auth, RADIUS_AUTHLEN);
-
-  /* If packet contains message authenticator: Calculate it! */
-  if (!radius_getattr(pack, &ma, RADIUS_ATTR_MESSAGE_AUTHENTICATOR, 0,0,0)) {
-    radius_hmac_md5(this, pack, this->proxysecret, this->proxysecretlen, ma->v.t);
-  }
-
-  radius_authresp_authenticator(this, pack, req_auth,
-				this->proxysecret,
-				this->proxysecretlen);
-
-  return radius_pkt_send_proxy(this, pack, peer);
-}
-#endif
 
 #ifdef ENABLE_COA
 /*
@@ -2029,58 +1912,3 @@ int radius_decaps(struct radius_t *this, int idx) {
   syslog(LOG_WARNING, "Received unknown RADIUS packet %d!", pack.code);
   return -1;
 }
-
-#ifdef ENABLE_RADPROXY
-/*
- * radius_proxy_ind()
- * Read and process a received radius packet.
- */
-int radius_proxy_ind(struct radius_t *this, int idx) {
-  ssize_t status;
-  struct radius_packet_t pack;
-  struct sockaddr_in addr;
-  socklen_t fromlen = sizeof(addr);
-
-  if ((status = recvfrom(this->proxyfd, &pack, sizeof(pack), 0,
-			 (struct sockaddr *) &addr, &fromlen)) <= 0) {
-    syslog(LOG_ERR, "%s: recvfrom() failed", strerror(errno));
-    return -1;
-  }
-
-  syslog(LOG_DEBUG, "Received RADIUS proxy packet id=%d", pack.id);
-
-  if (status < RADIUS_HDRSIZE) {
-    syslog(LOG_WARNING, "Received RADIUS packet which is too short: %zd < %d!",
-           status, RADIUS_HDRSIZE);
-    return -1;
-  }
-
-  if (ntohs(pack.length) != (uint16_t)status) {
-    syslog(LOG_ERR, "Received RADIUS packet with wrong length field %d != %zd!",
-           ntohs(pack.length), status);
-    return -1;
-  }
-
-  if ((this->cb_ind) &&
-      ((pack.code == RADIUS_CODE_ACCESS_REQUEST) ||
-       (pack.code == RADIUS_CODE_ACCOUNTING_REQUEST) ||
-       (pack.code == RADIUS_CODE_DISCONNECT_REQUEST) ||
-       (pack.code == RADIUS_CODE_STATUS_REQUEST))) {
-
-    if ( (addr.sin_addr.s_addr   & this->proxymask.s_addr) !=
-	 (this->proxyaddr.s_addr & this->proxymask.s_addr) ) {
-
-      syslog(LOG_WARNING, "Received RADIUS proxy request from wrong address %s",
-             inet_ntoa(addr.sin_addr));
-
-      return -1;
-    }
-
-    return this->cb_ind(this, &pack, &addr);
-  }
-
-  syslog(LOG_WARNING, "Received unknown RADIUS proxy packet %d!", pack.code);
-  return -1;
-}
-
-#endif

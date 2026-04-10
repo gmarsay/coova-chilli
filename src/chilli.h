@@ -100,12 +100,9 @@ struct app_conn_t {
   struct session_params s_params;         /* Session parameters */
   struct session_state  s_state;          /* Session state */
 
-  /* Radius authentication stuff */
-  /* Parameters are initialised whenever a reply to an access request
-     is received. */
-#ifdef ENABLE_RADPROXY
-  uint8_t chal[MAX_EAP_LEN];     /* EAP challenge */
-  size_t challen;                /* Length of EAP challenge */
+  /* RADIUS auth handshake (EAP / MPPE from Access-Challenge / Access-Accept) */
+  uint8_t chal[MAX_EAP_LEN];
+  size_t challen;
   uint8_t sendkey[RADIUS_ATTR_VLEN];
   uint8_t recvkey[RADIUS_ATTR_VLEN];
   uint8_t lmntkeys[RADIUS_MPPEKEYSSIZE];
@@ -116,11 +113,8 @@ struct app_conn_t {
   uint32_t types;
   uint8_t ms2succ[MS2SUCCSIZE];
   size_t ms2succlen;
-#endif
 
-  /* Radius proxy stuff */
-  /* Parameters are initialised whenever a radius proxy request is received */
-  /* Only one outstanding request allowed at a time */
+  /* Radius client: one outstanding request */
   int radiuswait;                /* Radius request in progres */
   struct sockaddr_in radiuspeer; /* Where to send reply */
   uint8_t radiusid;              /* ID to reply with */
@@ -138,9 +132,6 @@ struct app_conn_t {
   struct in_addr hisip;        /* Client IP address */
   struct in_addr hismask;      /* Client IP address mask */
   struct in_addr reqip;        /* IP requested by client */
-#ifdef ENABLE_UAMANYIP
-  struct in_addr natip;
-#endif
   uint16_t mtu;
 
   /* Information for each connection */

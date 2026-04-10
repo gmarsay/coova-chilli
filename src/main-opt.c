@@ -51,9 +51,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_COA
     "ENABLE_COA "
 #endif
-#ifdef ENABLE_RADPROXY
-    "ENABLE_RADPROXY "
-#endif
 #ifdef ENABLE_DHCPRADIUS
     "ENABLE_DHCPRADIUS "
 #endif
@@ -266,11 +263,6 @@ int main(int argc, char **argv) {
   _options.radiustimeout = args_info.radiustimeout_arg;
   _options.radiusretry = args_info.radiusretry_arg;
   _options.radiusretrysec = args_info.radiusretrysec_arg;
-#ifdef ENABLE_RADPROXY
-  _options.proxyport = args_info.proxyport_arg;
-  _options.proxymacaccept = args_info.proxymacaccept_flag;
-  _options.proxyonacct = args_info.proxyonacct_flag;
-#endif
   _options.txqlen = args_info.txqlen_arg;
   _options.sndbuf = args_info.sndbuf_arg;
   _options.rcvbuf = args_info.rcvbuf_arg;
@@ -745,39 +737,6 @@ int main(int argc, char **argv) {
     _options.radiusserver2.s_addr = 0;
   }
 
-  /* If no listen option is specified listen to any local port    */
-  /* Do hostname lookup to translate hostname to IP address       */
-#ifdef ENABLE_RADPROXY
-  if (args_info.proxylisten_arg) {
-    if (!(host = gethostbyname(args_info.proxylisten_arg))) {
-      syslog(LOG_ERR, "Invalid listening address: %s! [%s]",
-             args_info.proxylisten_arg, strerror(errno));
-      if (!args_info.forgiving_flag)
-	goto end_processing;
-    }
-    else {
-      memcpy(&_options.proxylisten.s_addr, host->h_addr, host->h_length);
-    }
-  }
-  else {
-    _options.proxylisten.s_addr = htonl(INADDR_ANY);
-  }
-
-  /* Store proxyclient as in_addr net and mask                       */
-  if (args_info.proxyclient_arg) {
-    if(option_aton(&_options.proxyaddr, &_options.proxymask,
-		   args_info.proxyclient_arg, 0)) {
-      syslog(LOG_ERR, "Invalid proxy client address: %s!", args_info.proxyclient_arg);
-      if (!args_info.forgiving_flag)
-	goto end_processing;
-    }
-  }
-  else {
-    _options.proxyaddr.s_addr = ~0; /* Let nobody through */
-    _options.proxymask.s_addr = 0;
-  }
-#endif
-
   memset(_options.macok, 0, sizeof(_options.macok));
   _options.macoklen = 0;
 
@@ -852,15 +811,6 @@ int main(int argc, char **argv) {
 
 #ifdef HAVE_NETFILTER_COOVA
   _options.kname = STRDUP(args_info.kname_arg);
-#endif
-
-#ifdef ENABLE_RADPROXY
-  if (!args_info.proxysecret_arg) {
-    _options.proxysecret = STRDUP(args_info.radiussecret_arg);
-  }
-  else {
-    _options.proxysecret = STRDUP(args_info.proxysecret_arg);
-  }
 #endif
 
   _options.wwwdir = STRDUP(args_info.wwwdir_arg);
