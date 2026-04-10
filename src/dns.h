@@ -25,14 +25,21 @@
 #define DNS_DEFAULT_MODE 0
 #define DNS_MDNS_MODE 1
 
+/*
+ * Decode the QNAME at *pktp within a DNS message starting at dns0 / dnslen.
+ * On success, advances *pktp and *left, writes a NUL-terminated name into name,
+ * and sets *namelen_out to the number of octets consumed from the DNS stream.
+ */
 int
 dns_getname(uint8_t **pktp, size_t *left,
-	    char *name, size_t namesz, size_t *nameln);
+	    const uint8_t *dns0, size_t dnslen,
+	    char *name, size_t namesz,
+	    size_t *namelen_out);
 
 ssize_t
 dns_fullname(char *data, size_t dlen,
 	     uint8_t *res, size_t reslen,
-	     uint8_t *opkt, size_t olen,
+	     const uint8_t *opkt, size_t olen,
 	     int lvl);
 
 int
