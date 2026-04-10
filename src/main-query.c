@@ -60,10 +60,6 @@ static cmd_info commands[] = {
 #endif
   { CMDSOCK_ADD_GARDEN,  "addgarden", NULL },
   { CMDSOCK_REM_GARDEN,  "remgarden", NULL },
-#if defined(ENABLE_LOCATION) && defined(HAVE_AVL)
-  { CMDSOCK_LISTLOC,       "listloc",       NULL },
-  { CMDSOCK_LISTLOCSUM,    "listlocsum",    NULL },
-#endif
   { 0, NULL, NULL }
 };
 
@@ -171,13 +167,6 @@ static struct cmd_arguments args[] = {
     sizeof(request.d.sess.params.routeidx),
     &request.d.sess.params.routeidx,
     "Route interface index",  0, 0 },
-#endif
-#ifdef ENABLE_LOCATION
-  { "location",
-    CMDSOCK_FIELD_STRING,
-    sizeof(request.d.sess.location),
-    request.d.sess.location,
-    "Location of session to perform action on", 0, 0 },
 #endif
   { "noacct",
     CMDSOCK_FIELD_NONE, 0, 0,
@@ -456,10 +445,6 @@ int main(int argc, char **argv) {
 
       switch(request.type) {
 
-#if defined(ENABLE_LOCATION) && defined(HAVE_AVL)
-        case CMDSOCK_LISTLOC:
-        case CMDSOCK_LISTLOCSUM:
-#endif
         case CMDSOCK_LIST:
         case CMDSOCK_LOGIN:
         case CMDSOCK_LOGOUT:

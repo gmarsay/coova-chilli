@@ -44,10 +44,6 @@ typedef enum {
 #endif
   CMDSOCK_ADD_GARDEN,
   CMDSOCK_REM_GARDEN,
-#if defined(ENABLE_LOCATION) && defined(HAVE_AVL)
-  CMDSOCK_LISTLOC,
-  CMDSOCK_LISTLOCSUM,
-#endif
 } chilli_cmdtype;
 #define  CMDSOCK_OPT_JSON      (1)
 
@@ -64,9 +60,6 @@ struct cmdsock_request {
       char username[256];
       char password[256];
       char sessionid[17];
-#ifdef ENABLE_LOCATION
-      char location[MAX_LOCATION_LENGTH];
-#endif
       struct session_params params;
     } sess;
     char data[1024];

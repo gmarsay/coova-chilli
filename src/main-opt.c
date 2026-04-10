@@ -117,9 +117,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_LEAKYBUCKET
     "ENABLE_LEAKYBUCKET "
 #endif
-#ifdef ENABLE_LOCATION
-    "ENABLE_LOCATION "
-#endif
 #ifdef ENABLE_MDNS
     "ENABLE_MDNS "
 #endif
@@ -486,7 +483,7 @@ int main(int argc, char **argv) {
   _options.bwbucketminsize = args_info.bwbucketminsize_arg;
 #endif
 
-#if defined(ENABLE_PROXYVSA) || defined(ENABLE_LOCATION)
+#ifdef ENABLE_PROXYVSA
   _options.vlanlocation = args_info.vlanlocation_flag;
   _options.location_stop_start = args_info.locationstopstart_flag;
   _options.location_copy_called = args_info.locationcopycalled_flag;
@@ -1282,7 +1279,7 @@ int main(int argc, char **argv) {
   _options.ieee8021q_only = args_info.only8021q_flag;
   _options.vlanupdate = STRDUP(args_info.vlanupdate_arg);
 #endif
-#if defined(ENABLE_PROXYVSA) || defined(ENABLE_LOCATION)
+#ifdef ENABLE_PROXYVSA
   _options.locationupdate = STRDUP(args_info.locationupdate_arg);
 #endif
   _options.nochallenge = args_info.nochallenge_flag;

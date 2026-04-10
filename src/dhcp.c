@@ -444,15 +444,6 @@ void dhcp_checktag(struct dhcp_conn_t *conn, uint8_t *pack) {
 	vlanupdate_script(conn, _options.vlanupdate, oldtag);
       }
 
-#ifdef ENABLE_LOCATION
-      if (_options.vlanlocation && appconn) {
-	char vid[16];
-	snprintf(vid, sizeof(vid), "%d",
-		      (int)ntohs(tag & PKT_8021Q_MASK_VID));
-	chilli_learn_location((uint8_t *)vid, strlen(vid), appconn, 1);
-      }
-#endif
-
     }
     if (appconn) {
       appconn->s_state.tag8021q = conn->tag8021q;
@@ -2998,39 +2989,11 @@ dhcp_handler(int type,
 	     struct dhcp_conn_t *dhcpconn,
 	     uint8_t *pack, size_t len,
 	     uint8_t *packet, size_t pos) {
-#ifdef ENABLE_LOCATION
-  struct app_conn_t *appconn = 0;
-#endif
-
-#ifdef ENABLE_LOCATION
-  if (_options.location_option_82) {
-    switch(type) {
-      case CHILLI_DHCP_PROXY:
-      case CHILLI_DHCP_OFFER:
-      case CHILLI_DHCP_ACK: {
-        struct dhcp_tag_t * opt82 = 0;
-        struct dhcp_packet_t * dhcpp = pkt_dhcppkt(pack);
-
-        if (!dhcp_gettag(dhcpp, ntohs(pkt_udphdr(pack)->len)-PKT_UDP_HLEN,
-                         &opt82, DHCP_OPTION_82)) {
-
-          if (!appconn && dhcpconn)
-            appconn = (struct app_conn_t *) dhcpconn->peer;
-
-          if (!appconn)
-            chilli_getconn(&appconn, dhcpp->yiaddr, 0, 0);
-
-          if (appconn) {
-            chilli_learn_location(opt82->v, opt82->l, appconn, 1);
-          } else {
-            if (_options.debug)
-              syslog(LOG_DEBUG, "%s(%d): no appconn for option 82", __FUNCTION__, __LINE__);
-          }
-        }
-      } break;
-    }
-  }
-#endif
+  (void)type;
+  (void)dhcpconn;
+  (void)pack;
+  (void)len;
+  (void)packet;
 
   return pos;
 }

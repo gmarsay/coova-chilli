@@ -685,16 +685,6 @@ if test x"$enable_extadmvsa" = xyes; then
    AC_DEFINE(ENABLE_EXTADMVSA,1,[Define to enable admin-user VSA support])
 fi
 
-AC_ARG_ENABLE(location, [AS_HELP_STRING([--enable-location],[Enable Location Awareness])], 
-  enable_location=$enableval, enable_location=no)
-
-if test x"$enable_location" = xyes ; then
-   AC_DEFINE(ENABLE_LOCATION,1,[Define enable Location Awareness])
-fi
-
-AM_CONDITIONAL(WITH_LOCATION, [test x"$enable_location" = xyes])
-
-
 AC_ARG_ENABLE(forcedns, [AS_HELP_STRING([--enable-forcedns],[Enable the forcing (NAT) of DNS])], 
   enable_forcedns=$enableval, enable_forcedns=no)
 

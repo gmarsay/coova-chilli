@@ -91,7 +91,7 @@ struct redir_state {
   /*  EAP identity of the last request sent */
   uint8_t eap_identity;
 
-#if defined(ENABLE_LOCATION) || defined(ENABLE_PROXYVSA)
+#ifdef ENABLE_PROXYVSA
   uint8_t called[RADIUS_ATTR_VLEN];
   uint8_t calledlen;
 #endif
@@ -142,30 +142,12 @@ struct session_state {
   uint64_t other_output_octets;
 #endif
 
-#if defined(ENABLE_LOCATION) && defined(HAVE_AVL)
-  uint64_t input_octets_old;
-  uint64_t output_octets_old;
-#ifdef ENABLE_GARDENACCOUNTING
-  uint64_t garden_input_octets_old;
-  uint64_t garden_output_octets_old;
-  uint64_t other_input_octets_old;
-  uint64_t other_output_octets_old;
-#endif
-#endif
-
 #ifdef ENABLE_SESSIONSTATE
   uint32_t session_state;
 #endif
 
 #ifdef ENABLE_IEEE8021Q
   uint16_t tag8021q;
-#endif
-
-#ifdef ENABLE_LOCATION
-#define MAX_LOCATION_LENGTH 56
-  char location[MAX_LOCATION_LENGTH];
-  char pending_location[MAX_LOCATION_LENGTH];
-  uint16_t location_changes;
 #endif
 
 #ifdef ENABLE_MULTILAN

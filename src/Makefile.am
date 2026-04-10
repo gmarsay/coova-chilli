@@ -57,10 +57,6 @@ libchilli_la_LIBADD += $(top_builddir)/json/libjson.la
 LDADD += $(top_builddir)/json/libjson.la 
 endif
 
-if WITH_LOCATION
-libchilli_la_SOURCES += location.c 
-endif
-
 if WITH_SFHASH
 libchilli_la_SOURCES += sfhash.c
 endif

@@ -261,7 +261,7 @@ struct options_t {
   uint8_t proxymacaccept:1;         /* Auto-accept non-EAP requests on proxy port */
   uint8_t proxyonacct:1;
 #endif
-#if defined(ENABLE_LOCATION) || defined(ENABLE_PROXYVSA)
+#ifdef ENABLE_PROXYVSA
   uint8_t vlanlocation:1;
   uint8_t location_stop_start:1;
   uint8_t location_copy_called:1;
@@ -318,7 +318,7 @@ struct options_t {
   uint32_t challengetimeout;
   uint32_t challengetimeout2;
 
-#if defined(ENABLE_LOCATION) || defined(ENABLE_PROXYVSA)
+#ifdef ENABLE_PROXYVSA
 #define PROXYVSA_ATTR_CNT 4
   struct {
     uint32_t attr_vsa;

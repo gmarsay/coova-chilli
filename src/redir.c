@@ -406,21 +406,6 @@ static void bstring_buildurl(bstring str, struct redir_conn_t *conn,
         bconcat(str, bt2);
       }
 
-#ifdef ENABLE_LOCATION
-  if (conn->s_state.location[0]) {
-    bcatcstr(str, amp);
-    bcatcstr(str, "loc=");
-    bassigncstr(bt, conn->s_state.location);
-    redir_urlencode(bt, bt2);
-
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): found %.*s", __FUNCTION__, __LINE__,
-             bt->slen, bt->data);
-
-    bconcat(str, bt2);
-  }
-#endif
-
   if (conn->lang[0]) {
     bcatcstr(str, amp);
     bcatcstr(str, "lang=");

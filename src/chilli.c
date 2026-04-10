@@ -544,7 +544,7 @@ double mainclock_diffd(struct timespec * past) {
 }
 
 uint8_t* chilli_called_station(struct session_state *state) {
-#ifdef ENABLE_LOCATION
+#ifdef ENABLE_PROXYVSA
   if (_options.location_copy_called && state->redir.calledlen) {
     return state->redir.called;
   }
@@ -955,11 +955,6 @@ int static freeconn(struct app_conn_t *conn) {
 #ifdef WITH_PATRICIA
   if (conn->ptree)
     patricia_destroy (conn->ptree, free);
-#endif
-
-#if defined(ENABLE_LOCATION) && defined(HAVE_AVL)
-  /*remove from location list (if we have a location/are in list) !!??*/
-  if (conn->loc_search_node!=NULL) location_close_conn(conn,1);
 #endif
 
   /* Remove from link of used */
@@ -1400,22 +1395,6 @@ int chilli_req_attrs(struct radius_t *radius,
 
 #ifdef ENABLE_PROXYVSA
   radius_addvsa(pack, &state->redir);
-#endif
-
-#ifdef ENABLE_LOCATION
-  if (state->location[0]) {
-    radius_addattr(radius, pack, RADIUS_ATTR_VENDOR_SPECIFIC,
-		   RADIUS_VENDOR_COOVACHILLI,
-		   RADIUS_ATTR_COOVACHILLI_LOCATION,
-		   0, (uint8_t *) state->location,
-		   strlen(state->location));
-    if (state->location_changes) {
-      radius_addattr(radius, pack, RADIUS_ATTR_VENDOR_SPECIFIC,
-		     RADIUS_VENDOR_COOVACHILLI,
-		     RADIUS_ATTR_COOVACHILLI_LOCATION_CHANGE_COUNT,
-		     (uint32_t) state->location_changes, 0, 0);
-    }
-  }
 #endif
 
   /* Include NAS-Identifier if given in configuration options */
@@ -2712,178 +2691,7 @@ int cb_redir_getstate(struct redir_t *redir,
   return conn->s_state.authenticated == 1;
 }
 
-#ifdef ENABLE_LOCATION
-int
-chilli_learn_location(uint8_t *loc, int loclen,
-		      struct app_conn_t *appconn, char force) {
-  char loc_buff[MAX_LOCATION_LENGTH];
-  char prev_loc_buff[MAX_LOCATION_LENGTH];
-  int prev_loc_len=0;
-
-  char has_new_location = 0;
-  char restart_accounting = 0;
-
-  if (loclen >= MAX_LOCATION_LENGTH) {
-    syslog(LOG_ERR, "Location too long %d", loclen);
-    return 0;
-  }
-
-  memcpy(loc_buff, (char *)loc, loclen);
-  loc_buff[loclen]=0;
-
-  strlcpy(prev_loc_buff, appconn->s_state.location, sizeof(prev_loc_buff));
-  prev_loc_len = strlen(prev_loc_buff);
-
-  if (_options.debug)
-    syslog(LOG_DEBUG, "%s(%d): Learned location : [%.*s]", __FUNCTION__, __LINE__, loclen, loc);
-
-  if (prev_loc_len == 0 ||
-      prev_loc_len != loclen ||
-      memcmp(prev_loc_buff, loc, prev_loc_len)) {
-
-    if (force || !strcmp(appconn->s_state.pending_location,
-			 loc_buff)) {
-
-      has_new_location = 1;
-      appconn->s_state.location_changes++;
-      appconn->s_state.pending_location[0]=0;
-
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): Learned new-location : %d [%.*s] old %d [%s]", __FUNCTION__, __LINE__,
-               loclen, loclen, loc,
-               prev_loc_len, prev_loc_buff);
-
-#if defined(ENABLE_LOCATION) && defined(HAVE_AVL)
-      location_add_conn(appconn, loc_buff);
-#endif
-
-      if (_options.locationupdate) {
-	runscript(appconn, _options.locationupdate,
-		  loc_buff, prev_loc_buff);
-      }
-
-      if (_options.location_stop_start) {
-	restart_accounting = 1;
-      }
-    } else {
-      strlcpy(appconn->s_state.pending_location, loc_buff,
-	sizeof(appconn->s_state.pending_location));
-    }
-  }
-
-  if (appconn->s_state.authenticated == 1 &&
-      has_new_location && restart_accounting) {
-    /* make sure not already over a limit ... */
-    session_interval(appconn);
-
-#ifdef ENABLE_SESSIONSTATE
-    appconn->s_state.session_state =
-        RADIUS_VALUE_COOVACHILLI_SESSION_LOCATION_CHANGE;
-#endif
-
-    if (appconn->s_state.authenticated == 1)
-      acct_req(ACCT_USER, appconn, RADIUS_STATUS_TYPE_STOP);
-  }
-
-#ifdef ENABLE_GARDENACCOUNTING
-  if (_options.uamgardendata &&
-      has_new_location && restart_accounting &&
-      appconn->hisip.s_addr) {
-
-#ifdef ENABLE_SESSIONSTATE
-    appconn->s_state.session_state =
-        RADIUS_VALUE_COOVACHILLI_SESSION_LOCATION_CHANGE;
-#endif
-
-    acct_req(ACCT_GARDEN, appconn, RADIUS_STATUS_TYPE_STOP);
-  }
-#endif
-
-  if (has_new_location) {
-    memcpy(appconn->s_state.location, (char *) loc, loclen);
-    appconn->s_state.location[loclen] = 0;
-  }
-
-#ifdef ENABLE_GARDENACCOUNTING
-  if (_options.uamgardendata &&
-      has_new_location && restart_accounting &&
-      appconn->hisip.s_addr) {
-    acct_req(ACCT_GARDEN, appconn, RADIUS_STATUS_TYPE_START);
-  }
-#endif
-
-  if (appconn->s_state.authenticated == 1 &&
-      has_new_location && restart_accounting) {
-
-    /* adjust session parameters to be zeroed out */
-
-    set_sessionid(appconn, 0);
-
-    if (appconn->s_params.sessiontimeout) {
-      uint32_t sessiontime = mainclock_diffu(appconn->s_state.start_time);
-      if (sessiontime > appconn->s_params.sessiontimeout)
-	/* (should be the case, having done the session_interval() above) */
-	appconn->s_params.sessiontimeout -= sessiontime;
-    }
-
-    if (appconn->s_params.maxinputoctets) {
-      if (appconn->s_params.maxinputoctets > appconn->s_state.input_octets)
-	appconn->s_params.maxinputoctets -= appconn->s_state.input_octets;
-    }
-
-    if (appconn->s_params.maxoutputoctets) {
-      if (appconn->s_params.maxoutputoctets > appconn->s_state.output_octets)
-	appconn->s_params.maxoutputoctets -= appconn->s_state.output_octets;
-    }
-
-    if (appconn->s_params.maxtotaloctets) {
-      uint64_t total = appconn->s_state.input_octets +
-          appconn->s_state.output_octets;
-      if (appconn->s_params.maxtotaloctets > total)
-	appconn->s_params.maxtotaloctets -= total;
-    }
-
-    appconn->s_state.start_time = mainclock.tv_sec;
-    appconn->s_state.interim_time = mainclock.tv_sec;
-    appconn->s_state.last_time = mainclock.tv_sec;
-    appconn->s_state.last_up_time = mainclock.tv_sec;
-    appconn->s_state.input_packets = 0;
-    appconn->s_state.input_octets = 0;
-    appconn->s_state.output_packets = 0;
-    appconn->s_state.output_octets = 0;
-
-    acct_req(ACCT_USER, appconn, RADIUS_STATUS_TYPE_START);
-  }
-  else if (_options.location_immediate_update && has_new_location) {
-
-#ifdef ENABLE_SESSIONSTATE
-    int old_state = appconn->s_state.session_state;
-
-    appconn->s_state.session_state =
-        RADIUS_VALUE_COOVACHILLI_SESSION_LOCATION_CHANGE;
-#endif
-
-    if (appconn->s_state.authenticated == 1)
-      acct_req(ACCT_USER, appconn, RADIUS_STATUS_TYPE_INTERIM_UPDATE);
-
-#ifdef ENABLE_GARDENACCOUNTING
-    if (_options.uamgardendata)
-      acct_req(ACCT_GARDEN, appconn, RADIUS_STATUS_TYPE_INTERIM_UPDATE);
-#endif
-
-#ifdef ENABLE_SESSIONSTATE
-    appconn->s_state.session_state = old_state;
-#endif
-
-  }
-
-  return 0;
-}
-#endif
-
-#ifdef ENABLE_RADPROXY
-
-#if defined(ENABLE_LOCATION) || defined(ENABLE_PROXYVSA)
+#ifdef ENABLE_PROXYVSA
 static int
 chilli_proxy_radlocation(struct radius_packet_t *pack,
 			 struct app_conn_t *appconn, char force) {
@@ -2926,65 +2734,6 @@ chilli_proxy_radlocation(struct radius_packet_t *pack,
 #endif
     }
   } while (attr);
-#endif
-
-#ifdef ENABLE_LOCATION
-  if (_options.proxy_loc[0].attr) {
-    int i;
-
-    attr = 0;
-
-    for (i=0; i < PROXYVSA_ATTR_CNT; i++) {
-
-      if (!_options.proxy_loc[i].attr_vsa &&
-	  !_options.proxy_loc[i].attr)
-	break;
-
-      if (!_options.proxy_loc[i].attr_vsa) {
-	/*
-	 *  We have a loc_attr, but it isn't a VSA (so not included above)
-	 */
-
-#if(_debug_)
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): looking for attr %d", __FUNCTION__, __LINE__, _options.proxy_loc[i].attr);
-#endif
-
-	if (radius_getattr(pack, &attr, _options.proxy_loc[i].attr,
-			   0, 0, 0)) {
-          if (_options.debug)
-            syslog(LOG_DEBUG, "%s(%d): didn't find attr %d", __FUNCTION__, __LINE__, _options.proxy_loc[i].attr);
-	  attr = 0;
-	}
-      } else {
-	/*
-	 *  We have a loc_attr and VSA number (so it is included above).
-	 */
-
-#if(_debug_)
-        if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): looking for attr %d/%d", __FUNCTION__, __LINE__, _options.proxy_loc[i].attr_vsa,
-                 _options.proxy_loc[i].attr);
-#endif
-
-	if (radius_getattr(pack, &attr,
-			   RADIUS_ATTR_VENDOR_SPECIFIC,
-			   _options.proxy_loc[i].attr_vsa,
-			   _options.proxy_loc[i].attr, 0)) {
-#if(_debug_)
-          if (_options.debug)
-            syslog(LOG_DEBUG, "%s(%d): didn't find attr %d/%d", __FUNCTION__, __LINE__, _options.proxy_loc[i].attr_vsa,
-                   _options.proxy_loc[i].attr);
-#endif
-	  attr = 0;
-	}
-      }
-    }
-
-    if (attr && attr->l > 2) {
-      chilli_learn_location(attr->v.t, attr->l - 2, appconn, force);
-    }
-  }
 #endif
 
   return 0;
@@ -3151,7 +2900,7 @@ int accounting_request(struct radius_packet_t *pack,
     }
 #endif
 
-#if defined(ENABLE_LOCATION) || defined(ENABLE_PROXYVSA)
+#ifdef ENABLE_PROXYVSA
     switch (status_type) {
       case RADIUS_STATUS_TYPE_START:
         if (chilli_proxy_radlocation(pack, appconn, 1))
@@ -3385,7 +3134,7 @@ int access_request(struct radius_packet_t *pack,
     appconn->dnprot = DNPROT_WPA;
   }
 
-#if defined(ENABLE_LOCATION) || defined(ENABLE_PROXYVSA)
+#ifdef ENABLE_PROXYVSA
   if (chilli_proxy_radlocation(pack, appconn, 1))
     return radius_resp(radius, &radius_pack, peer, pack->authenticator);
 #endif
@@ -5033,17 +4782,6 @@ int chilli_getinfo(struct app_conn_t *appconn, bstring b, int fmt) {
         }
 #endif
 
-#ifdef ENABLE_LOCATION
-        if (appconn->s_state.location[0]) {
-          bstring tmp2 = bfromcstr("");
-          bcatcstr(b, " loc=");
-          bassigncstr(tmp, appconn->s_state.location);
-          redir_urlencode(tmp, tmp2);
-          bconcat(b, tmp2);
-          bdestroy(tmp2);
-        }
-#endif
-
         bdestroy(tmp);
       }
   }
@@ -6087,16 +5825,6 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
       }
       break;
 
-
-#if defined(ENABLE_LOCATION) && defined(HAVE_AVL)
-    case CMDSOCK_LISTLOC:
-    case CMDSOCK_LISTLOCSUM:
-      location_printlist(s, req->d.sess.location,
-			 (req->options & CMDSOCK_OPT_JSON),
-			 (req->type == CMDSOCK_LISTLOC));
-      break;
-#endif
-
     case CMDSOCK_RELOAD:
       _sigusr1(SIGUSR1);
       break;
@@ -6695,10 +6423,6 @@ int chilli_main(int argc, char **argv) {
 
 #ifdef HAVE_PATRICIA
     garden_patricia_reload();
-#endif
-
-#ifdef ENABLE_LOCATION
-    location_init();
 #endif
 
     /******************************************************************/
