@@ -4,17 +4,13 @@ sysconf_DATA = chilli.conf
 
 chillidir = $(sysconfdir)/chilli
 chilli_SCRIPTS = functions up.sh down.sh newmulti.sh wpad.dat
-chilli_DATA = defaults gui-config-default.ini
-
-pythondir = $(libdir)/python
-python_SCRIPTS = CoovaChilliLib.py
+chilli_DATA = defaults
 
 initdir = $(sysconfdir)/init.d
 init_SCRIPTS = chilli
 
 EXTRA_DIST = $(init_SCRIPTS:=.in) \
-$(chilli_SCRIPTS:=.in) chilli.conf.in defaults.in \
-CoovaChilliLib.py.in gui-config-default.ini 
+$(chilli_SCRIPTS:=.in) chilli.conf.in defaults.in
 
 edit = sed \
 	-e 's,@ETCDIR\@,$(sysconfdir),g' \
@@ -25,11 +21,6 @@ edit = sed \
 	-e 's,@ETCCHILLI\@,$(sysconfdir)/chilli,g' \
 	-e 's,@SYSCONFDIR\@,$(sysconfdir),g' \
 	-e 's,@PREFIX\@,$(prefix),g'
-
-CoovaChilliLib.py: Makefile CoovaChilliLib.py.in
-	rm -f CoovaChilliLib.py CoovaChilliLib.py.tmp
-	$(edit) CoovaChilliLib.py.in >CoovaChilliLib.py.tmp
-	mv CoovaChilliLib.py.tmp CoovaChilliLib.py
 
 functions: Makefile functions.in
 	rm -f functions functions.tmp

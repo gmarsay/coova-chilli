@@ -46,7 +46,6 @@ www/Makefile.in
 
 aclocal.m4
 compile
-conf/CoovaChilliLib.py
 conf/chilli
 conf/chilli.conf
 conf/defaults
@@ -63,11 +62,7 @@ config.status
 config.sub
 configure
 configure.status
-coova-doxygen
 depcomp
-distro/nethserver/coova-chilli.spec
-distro/redhat/coova-chilli.spec
-distro/suse/coova-chilli.spec
 doc/chilli-radius.5
 doc/chilli.8
 doc/chilli.conf.5
@@ -78,7 +73,6 @@ doc/chilli_radconfig.1
 doc/chilli_radsec.1
 doc/chilli_redir.1
 doc/chilli_response.1
-doc/chilli_rtmon.1
 doc/chilli_script.1
 install-sh
 libtool
@@ -95,7 +89,6 @@ src/chilli_response
 src/chilli_proxy
 src/chilli_radsec
 src/chilli_redir
-src/chilli_rtmon
 src/chilli_script
 
 www/config.sh
@@ -103,11 +96,3 @@ www/config.sh
 src/cmdline.[ch]
 src/cmdline.c.orig
 autom4te.cache
-
-debian/coova-chilli.debhelper.log
-debian/coova-chilli.postinst.debhelper
-debian/coova-chilli.postrm.debhelper
-debian/coova-chilli.prerm.debhelper
-debian/coova-chilli.substvars
-debian/coova-chilli/
-debian/files

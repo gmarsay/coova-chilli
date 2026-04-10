@@ -630,17 +630,6 @@ _avl_local_min(struct avl_node *node)
   return node;
 }
 
-#if 0
-static struct avl_node *
-avl_local_max(struct avl_node *node)
-{
-  while (node->right != NULL)
-    node = node->right;
-
-  return node;
-}
-#endif
-
 /**
  * Remove a node from a tree and rebalance it
  * @param tree pointer to tree

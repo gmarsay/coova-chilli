@@ -385,25 +385,6 @@ GetNewKeyFromSHA(char *StartKey, char *SessionKey, long SessionKeyLength,
   memcpy(InterimKey, Digest, SessionKeyLength);
 }
 
-#if 0
-static void
-Get_Key(char *InitialSessionKey, char *CurrentSessionKey,
-        int LengthOfDesiredKey)
-{
-  SHA_CTX Context;
-  u_char Digest[SHA_DIGEST_LENGTH];
-
-  SHA1_Init(&Context);
-  SHA1_Update(&Context, InitialSessionKey, LengthOfDesiredKey);
-  SHA1_Update(&Context, SHA1_Pad1, 40);
-  SHA1_Update(&Context, CurrentSessionKey, LengthOfDesiredKey);
-  SHA1_Update(&Context, SHA1_Pad2, 40);
-  SHA1_Final(Digest, &Context);
-
-  memcpy(CurrentSessionKey, Digest, LengthOfDesiredKey);
-}
-#endif
-
 /* passwordHash 16-bytes MD4 hashed password
    challenge    8-bytes peer CHAP challenge
    since passwordHash is in a 24-byte buffer, response is written in there */
