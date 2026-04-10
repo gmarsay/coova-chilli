@@ -30,8 +30,6 @@ conf/Makefile
 conf/Makefile.in
 debian/Makefile
 debian/Makefile.in
-distro/Makefile
-distro/Makefile.in
 doc/Makefile
 doc/Makefile.in
 json/Makefile

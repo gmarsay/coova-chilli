@@ -1,4 +1,6 @@
 == ChangeLog (CoovaChilli-v1.8) ==
+* Remove distro/openmoko packaging and OpenMoko-specific defaults in gui-config.
+* Remove Debian/RPM packaging trees and SUSE spec from the source tree.
 * RFC8910 - Captive Portal Identification (#593)
 * rename cyassl to wolfssl (#599)
 * fix compilation with kernel > 5.6 and PROC_FS (#600)
