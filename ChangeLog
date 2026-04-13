@@ -1,4 +1,7 @@
 == ChangeLog (CoovaChilli-v1.8) ==
+* Remove leftover Automake `Makefile.in` under `src/`; drop stale `doc/chilli.conf`; keep generated `cmdline.c`/`cmdline.h` only in Meson build directory (not in VCS).
+* `doc/meson.build`: stop installing removed extras `hotspotlogin.cgi` and `firewall.openwrt` (not shipped in tree).
+* Build system: Autotools removed; Meson + Ninja is the only supported build.
 * Drop UAM wwwbin/.chi/.cjs and static .js serving; ship only coova.html, coova.jpg, wait.gif under www/ (plus config.sh).
 * Remove unused miniportal tree (haserl sample portal sources).
 * Remove distro/openmoko packaging and OpenMoko-specific defaults in gui-config.

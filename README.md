@@ -9,14 +9,18 @@ Visit website for documentation and archived content
 
 Please use the [Github issues](https://github.com/coova/coova-chilli/issues) section for bug reports only.
 
-To get started after cloning git repository:
+To get started after cloning the repository (Meson + Ninja):
 
-  `sh bootstrap`
-  
-  `./configure` 
-  
-  `make`
+  `meson setup build`
 
-More details about the build process and dependencies are covered in the [INSTALL file](/INSTALL)
+  `meson compile -C build`
+
+  `meson install -C build`
+
+Dependencies: a C99 compiler, **pkg-config**, **libbstring** (`bstring.pc`, e.g. [msteinert/bstring](https://github.com/msteinert/bstring)), **libjson-c**, **gengetopt**, **patch**; optional **OpenSSL** (default: on, `-Dopenssl=false` to disable); **libbsd** if the C library has no `strlcpy`.
+
+Example with bstring installed under `/usr/local`:
+
+  `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig meson setup build`
 
 [![Github Actions Build Status](https://github.com/coova/coova-chilli/actions/workflows/actions.yml/badge.svg)](https://github.com/coova/coova-chilli/actions/workflows/actions.yml)

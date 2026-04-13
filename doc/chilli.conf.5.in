@@ -656,9 +656,9 @@ DNS packets being sent back to the subscriber.
 
 .TP
 .BI uamregex " host-pattern::path-pattern::qs-pattern"
-When chilli is built with the 
-.B --enable-chilliredir
-option given to the configure script, the 
+When chilli is built with compile-time
+.B ENABLE_CHILLIREDIR
+support (see Meson options / project documentation), the
 .B uamregex
 option is available. The value should be a
 .B ::

@@ -1,0 +1,2 @@
+option('openssl', type: 'boolean', value: true, description: 'Compiler avec OpenSSL (TLS)')
+option('nfcoova', type: 'boolean', value: false, description: 'Helpers module noyau Coova netfilter (kcoova.c)')

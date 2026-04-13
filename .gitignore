@@ -22,25 +22,6 @@
 **/.deps
 **/.libs
 
-Makefile
-Makefile.in
-bstring/Makefile
-bstring/Makefile.in
-conf/Makefile
-conf/Makefile.in
-debian/Makefile
-debian/Makefile.in
-doc/Makefile
-doc/Makefile.in
-src/Makefile
-src/Makefile.in
-src/mssl/Makefile
-src/mssl/Makefile.in
-www/Makefile
-www/Makefile.in
-
-aclocal.m4
-compile
 conf/chilli
 conf/chilli.conf
 conf/defaults
@@ -49,15 +30,7 @@ conf/functions
 conf/newmulti.sh
 conf/up.sh
 conf/wpad.dat
-config.guess
 config.h
-config.h.in
-config.log
-config.status
-config.sub
-configure
-configure.status
-depcomp
 doc/chilli-radius.5
 doc/chilli.8
 doc/chilli.conf.5
@@ -69,12 +42,6 @@ doc/chilli_radsec.1
 doc/chilli_redir.1
 doc/chilli_response.1
 doc/chilli_script.1
-install-sh
-libtool
-ltmain.sh
-m4/
-missing
-stamp-h1
 
 src/chilli
 src/chilli_opt
@@ -90,4 +57,8 @@ www/config.sh
 
 src/cmdline.[ch]
 src/cmdline.c.orig
-autom4te.cache
+
+build/
+builddir/
+meson-private/
+meson-logs/

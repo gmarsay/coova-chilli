@@ -3,8 +3,8 @@
 #   docker build --no-cache -f Dockerfile.buildcheck -t coova-chilli-buildcheck .
 FROM debian:bookworm
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
-    build-essential autoconf automake libtool pkg-config \
-    libssl-dev libjson-c-dev libbsd-dev gengetopt \
+    build-essential pkg-config \
+    libssl-dev libjson-c-dev libbsd-dev gengetopt patch perl \
     meson ninja-build git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -19,4 +19,4 @@ ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib/x86_64-linux-gnu/pkg
 
 WORKDIR /src
 COPY . .
-RUN autoreconf -fi && ./configure && make -j$(nproc)
+RUN meson setup build --prefix=/usr/local && meson compile -C build -j$(nproc)
