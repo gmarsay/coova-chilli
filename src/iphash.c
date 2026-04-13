@@ -181,6 +181,8 @@ int iphash_add(struct iphash_t *this, struct iphashm_t **member, struct in_addr 
 }
 
 int iphash_expire(struct iphash_t *this, int timeout) {
+  (void)this;
+  (void)timeout;
   return 0;
 }
 

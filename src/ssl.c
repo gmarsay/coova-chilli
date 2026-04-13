@@ -27,6 +27,8 @@ static openssl_env * sslenv_cli = 0;
 static int
 openssl_verify_peer_cb(int ok, X509_STORE_CTX *ctx) {
   int err = X509_STORE_CTX_get_error(ctx);
+
+  (void)ok;
   if (err != X509_V_OK) {
     syslog(LOG_ERR, "%d peer certificate error: #%d : %s\n",
            errno, err, X509_verify_cert_error_string(err));
@@ -335,6 +337,9 @@ openssl_accept_fd(openssl_env *env, int fd, int timeout, struct redir_conn_t *co
 int
 openssl_error(openssl_con *con, int ret, char *func) {
   int err = -1;
+#if !(_debug_ > 1)
+  (void)func;
+#endif
   if (con->con) {
     err = SSL_get_error(con->con, ret);
 #if(_debug_ > 1)

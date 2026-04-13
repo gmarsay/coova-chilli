@@ -34,6 +34,10 @@ static int chilliauth_cb(struct radius_t *radius,
   /*char attrs[RADIUS_ATTR_VLEN+1];*/
   size_t offset = 0;
 
+  (void)radius;
+  (void)pack_req;
+  (void)cbp;
+
   if (!pack) {
     syslog(LOG_ERR, "Radius request timed out");
     return 0;

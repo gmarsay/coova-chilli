@@ -77,7 +77,7 @@ struct cmd_arguments {
   int length;
   void *field;
   char *desc;
-  uint16_t *flag;
+  size_t flag_off;        /* 0 = none; else offsetof(struct cmdsock_request, ...) */
   uint16_t flagbit;
 };
 
@@ -154,13 +154,13 @@ static struct cmd_arguments args[] = {
     sizeof(request.d.sess.params.url),
     &request.d.sess.params.url,
     "Set splash page",
-    &request.d.sess.params.flags, REQUIRE_UAM_SPLASH },
+    offsetof(struct cmdsock_request, d.sess.params.flags), REQUIRE_UAM_SPLASH },
   { "url",
     CMDSOCK_FIELD_STRING,
     sizeof(request.d.sess.params.url),
     &request.d.sess.params.url,
     "Set redirect url",
-    &request.d.sess.params.flags, REQUIRE_REDIRECT },
+    offsetof(struct cmdsock_request, d.sess.params.flags), REQUIRE_REDIRECT },
 #ifdef ENABLE_MULTIROUTE
   { "routeidx",
     CMDSOCK_FIELD_INTEGER,
@@ -171,7 +171,7 @@ static struct cmd_arguments args[] = {
   { "noacct",
     CMDSOCK_FIELD_NONE, 0, 0,
     "No accounting flag",
-    &request.d.sess.params.flags, NO_ACCOUNTING },
+    offsetof(struct cmdsock_request, d.sess.params.flags), NO_ACCOUNTING },
   { "data",
     CMDSOCK_FIELD_STRING,
     sizeof(request.d.data),
@@ -246,6 +246,7 @@ static int usage(char *program) {
 }
 
 static void timeout_alarm(int signum) {
+  (void)signum;
   fprintf(stderr, "Timeout\n");
   exit(1);
 }
@@ -261,8 +262,9 @@ static int process_args(int argc, char *argv[], int argidx) {
 
       if (!strcmp(argv[argidx], args[i].name)) {
 
-	if (args[i].flag) {
-	  *(args[i].flag) |= args[i].flagbit;
+	if (args[i].flag_off) {
+	  uint16_t *fp = (uint16_t *)((unsigned char *)&request + args[i].flag_off);
+	  *fp |= args[i].flagbit;
 	} else if (args[i].flagbit == 1) {
 	  if (is_data == 0)
 	    is_data = 1;

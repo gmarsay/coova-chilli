@@ -285,6 +285,7 @@ int dhcp_send(struct dhcp_t *this, int idx,
   iface = &this->rawif[idx];
 #else
   iface = &this->rawif[0];
+  (void)idx;
 #endif
 
   return dhcp_net_send(iface, hismac, packet, length);
@@ -1192,6 +1193,7 @@ int dhcp_timeout(struct dhcp_t *this)
  * is left unchanged.
  **/
 struct timeval* dhcp_timeleft(struct dhcp_t *this, struct timeval *tvp) {
+  (void)this;
   return tvp;
 }
 
@@ -1894,6 +1896,10 @@ int dhcp_uam_nat(struct dhcp_conn_t *conn,
   int n;
   int pos = -1;
 
+#ifndef ENABLE_TAP
+  (void)ethh;
+#endif
+
 #if(_debug > 1)
   if (_options.debug)
     syslog(LOG_DEBUG, "%s(%d): uam_nat %s:%d", __FUNCTION__, __LINE__, inet_ntoa(*addr), port);
@@ -1947,6 +1953,11 @@ int dhcp_uam_unnat(struct dhcp_conn_t *conn,
 		   struct pkt_iphdr_t  *iph,
 		   struct pkt_tcphdr_t *tcph) {
   int n;
+
+#ifndef ENABLE_TAP
+  (void)ethh;
+#endif
+
   for (n=0; n < DHCP_DNAT_MAX; n++) {
 
     if (iph->daddr == conn->dnat[n].src_ip &&
@@ -2175,6 +2186,11 @@ int dhcp_garden_check(struct dhcp_t *this,
   pass_through *pt=0;
   int found = 0;
 
+#ifndef ENABLE_GARDENACCOUNTING
+  (void)conn;
+  (void)appconn;
+#endif
+
 #ifdef HAVE_PATRICIA
   if (dhcp->ptree && dhcp->ptree_dyn) {
 
@@ -2305,6 +2321,8 @@ int dhcp_doDNAT(struct dhcp_conn_t *conn, uint8_t *pack,
 		char *do_checksum) {
   struct dhcp_t *this = conn->parent;
   struct pkt_ethhdr_t *ethh = pkt_ethhdr(pack);
+
+  (void)len;
   struct pkt_iphdr_t  *iph  = pkt_iphdr(pack);
   struct pkt_tcphdr_t *tcph = pkt_tcphdr(pack);
 
@@ -2375,6 +2393,8 @@ int dhcp_postauthDNAT(struct dhcp_conn_t *conn, uint8_t *pack,
 		      size_t len, char is_return, char *do_checksum) {
   struct dhcp_t *this = conn->parent;
   struct pkt_ethhdr_t *ethh = pkt_ethhdr(pack);
+
+  (void)len;
   struct pkt_iphdr_t  *iph  = pkt_iphdr(pack);
   struct pkt_tcphdr_t *tcph = pkt_tcphdr(pack);
 
@@ -2439,6 +2459,8 @@ int dhcp_undoDNAT(struct dhcp_conn_t *conn,
 		  char do_reset, char *do_checksum) {
   struct dhcp_t *this = conn->parent;
   struct pkt_ethhdr_t *ethh = pkt_ethhdr(pack);
+
+  (void)plen;
   struct pkt_iphdr_t  *iph  = pkt_iphdr(pack);
   struct pkt_tcphdr_t *tcph = pkt_tcphdr(pack);
 
@@ -2495,6 +2517,7 @@ int dhcp_undoDNAT(struct dhcp_conn_t *conn,
  **/
 int
 dhcp_getdefault(uint8_t *pack) {
+  (void)pack;
 
   return 0;
 }
@@ -3215,6 +3238,8 @@ int dhcp_set_addrs(struct dhcp_conn_t *conn,
 		   struct in_addr *hisip, struct in_addr *hismask,
 		   struct in_addr *ourip, struct in_addr *ourmask,
 		   struct in_addr *dns1,  struct in_addr *dns2) {
+
+  (void)ourmask;
 
   conn->hisip.s_addr = hisip->s_addr;
   conn->hismask.s_addr = hismask->s_addr;
@@ -4467,11 +4492,14 @@ int dhcp_relay_decaps(struct dhcp_t *this, int idx) {
   struct dhcp_tag_t *message_type = 0;
   struct dhcp_conn_t *conn = 0;
   struct dhcp_packet_t packet;
+  struct in_addr yiaddr_sa;
   struct sockaddr_in addr;
   socklen_t fromlen = sizeof(addr);
   ssize_t length;
 
   uint8_t fullpack[1500];
+
+  (void)idx;
 
   if ((length = recvfrom(this->relayfd, &packet, sizeof(packet), 0,
                          (struct sockaddr *) &addr, &fromlen)) <= 0) {
@@ -4533,7 +4561,8 @@ int dhcp_relay_decaps(struct dhcp_t *this, int idx) {
   if (message_type->v[0] != DHCPNAK &&
       (conn->authstate == DHCP_AUTH_NONE ||
        conn->authstate == DHCP_AUTH_DNAT)) {
-    this->cb_request(conn, (struct in_addr *)&packet.yiaddr, 0, 0);
+    yiaddr_sa.s_addr = packet.yiaddr;
+    this->cb_request(conn, &yiaddr_sa, 0, 0);
   }
 
   packet.giaddr = 0;
@@ -4777,6 +4806,8 @@ int dhcp_sendARP(struct dhcp_conn_t *conn, uint8_t *pack, size_t len) {
 
   struct pkt_ethhdr_t *packet_ethh;
   struct arp_packet_t *packet_arp;
+
+  (void)len;
 
   /* Get local copy */
   memcpy(&reqaddr.s_addr, pack_arp->tpa, PKT_IP_ALEN);

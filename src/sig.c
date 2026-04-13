@@ -29,6 +29,7 @@ static void _trigger (int s) {
 }
 
 static void _ignore (int s) {
+  (void)s;
   /*log_dbg("PID %d SIG Ignore %d", getpid(), s);*/
 }
 

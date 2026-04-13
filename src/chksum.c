@@ -19,6 +19,12 @@
 
 #include "chilli.h"
 
+/* Paquets sur buffer aligné 1 octet : casts vers uint16_t * pour in_cksum. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+#endif
+
 #define cksum_wrap(c) (c=(c>>16)+(c&0xffff),(~(c+(c>>16))&0xffff))
 
 uint32_t
@@ -178,4 +184,8 @@ int chksum(struct pkt_iphdr_t *iph) {
 
   return 0;
 }
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 

@@ -104,6 +104,8 @@ int session_json_acct(struct session_state *state,
   uint32_t sessiontime;
   uint32_t idletime;
 
+  (void)params;
+
   sessiontime = mainclock_diffu(state->start_time);
   idletime    = mainclock_diffu(state->last_up_time);
 

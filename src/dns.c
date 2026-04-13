@@ -314,6 +314,7 @@ dns_copy_res(struct dhcp_conn_t *conn, int q,
 	uint16_t us;
 
 	(void)conn;
+	(void)mode;
 
 #if(_debug_ > 1)
 	if (_options.debug)

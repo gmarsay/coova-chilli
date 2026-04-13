@@ -291,6 +291,8 @@ pid_t chilli_fork(uint8_t type, char *name) {
 static void _sigchld(int signum) {
   pid_t pid;
   int stat;
+
+  (void)signum;
   while ((pid = waitpid(-1, &stat, WNOHANG)) > 0) {
 #if(_debug_)
     if (_options.debug)
@@ -314,6 +316,7 @@ static void _sigchld(int signum) {
 }
 
 static void _sigterm(int signum) {
+  (void)signum;
   syslog(LOG_DEBUG, "%s(%d): SIGTERM: shutdown", __FUNCTION__, __LINE__);
   if (p_keep_going)
     *p_keep_going = 0;
@@ -326,6 +329,7 @@ static void _sigvoid(int signum) {
 }
 
 static void _sigusr1(int signum) {
+  (void)signum;
   syslog(LOG_DEBUG, "%s(%d): SIGUSR1: reloading configuration", __FUNCTION__, __LINE__);
 
   if (p_reload_config)
@@ -344,6 +348,7 @@ static void _sigusr1(int signum) {
 }
 
 static void _sighup(int signum) {
+  (void)signum;
   syslog(LOG_DEBUG, "%s(%d): SIGHUP: rereading configuration", __FUNCTION__, __LINE__);
 
   do_interval = 1;
@@ -351,6 +356,9 @@ static void _sighup(int signum) {
 
 int chilli_handle_signal(void *ctx, int fd) {
   int signo = selfpipe_read();
+
+  (void)ctx;
+  (void)fd;
 #if(_debug_)
   if (_options.debug)
     syslog(LOG_DEBUG, "%s(%d): caught %d via selfpipe", __FUNCTION__, __LINE__,  signo);
@@ -518,6 +526,9 @@ double mainclock_diffd(struct timespec * past) {
 }
 
 uint8_t* chilli_called_station(struct session_state *state) {
+#ifndef ENABLE_PROXYVSA
+  (void)state;
+#endif
 #ifdef ENABLE_PROXYVSA
   if (_options.location_copy_called && state->redir.calledlen) {
     return state->redir.called;
@@ -527,6 +538,9 @@ uint8_t* chilli_called_station(struct session_state *state) {
 }
 
 static void set_sessionid(struct app_conn_t *appconn, char full) {
+#ifndef ENABLE_SESSIONID
+  (void)full;
+#endif
   appconn->rt = (int) mainclock_rt();
 
   snprintf(appconn->s_state.sessionid,
@@ -613,8 +627,9 @@ leaky_bucket(struct app_conn_t *conn,
   int result = 0;
   uint64_t upbytes=0, dnbytes=0;
   long double timediff;
+  struct timespec last_bw = conn->s_state.last_bw_time;
 
-  timediff = mainclock_diffd(&conn->s_state.last_bw_time);
+  timediff = mainclock_diffd(&last_bw);
 
   if (conn->s_params.bandwidthmaxup) {
     upbytes = (uint64_t) ((timediff * conn->s_params.bandwidthmaxup) / 8);
@@ -724,8 +739,8 @@ void set_env(char *name, char type, void *value, int len) {
 
     case VAL_STRING:
       if (len > 0) {
-        if (len > sizeof(s) - 1)
-          len = sizeof(s) - 1;
+        if ((size_t)len > sizeof(s) - 1)
+          len = (int)(sizeof(s) - 1);
         memcpy(s, (char*)value, len);
         s[len]=0;
         v = s;
@@ -824,6 +839,9 @@ int runscript(struct app_conn_t *appconn, char* script,
  ***********************************************************/
 
 static int newip(struct ippoolm_t **ipm, struct in_addr *hisip, uint8_t *hismac) {
+#ifndef ENABLE_UAMANYIP
+  (void)hismac;
+#endif
 
 #ifdef ENABLE_UAMANYIP
   struct in_addr tmpip;
@@ -1153,7 +1171,7 @@ static int checkconn(void) {
   /* Reread configuration file and recheck DNS */
   if (_options.interval) {
     rereaddiff = mainclock_diffu(rereadtime);
-    if (rereaddiff >= _options.interval) {
+    if (rereaddiff >= (uint32_t)_options.interval) {
       rereadtime = mainclock.tv_sec;
       do_interval = 1;
     }
@@ -1399,6 +1417,9 @@ static int auth_radius(struct app_conn_t *appconn,
 		       char *username, char *password,
 		       uint8_t *dhcp_pkt, size_t dhcp_len) {
   struct dhcp_conn_t *dhcpconn = (struct dhcp_conn_t *)appconn->dnlink;
+
+  (void)dhcp_pkt;
+  (void)dhcp_len;
   struct radius_packet_t radius_pack;
   char mac[MACSTRLEN+1];
 
@@ -2107,6 +2128,9 @@ static int fwd_ssdp(struct in_addr *dst,
  */
 
 int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
+#if !defined(ENABLE_MULTIROUTE) && !defined(ENABLE_TAP)
+  (void)idx;
+#endif
   struct in_addr dst;
   struct ippoolm_t *ipm;
   struct app_conn_t *appconn = 0;
@@ -2416,6 +2440,7 @@ int cb_redir_getstate(struct redir_t *redir,
 		      struct sockaddr_in *address,
 		      struct sockaddr_in *baddress,
 		      struct redir_conn_t *conn) {
+  (void)redir;
   struct in_addr *addr = &address->sin_addr;
   struct ippoolm_t *ipm;
   struct app_conn_t *appconn;
@@ -2556,11 +2581,13 @@ session_disconnect(struct app_conn_t *appconn,
 		   struct dhcp_conn_t *dhcpconn,
 		   int term_cause) {
 
-  terminate_appconn(appconn,
-		    term_cause ? term_cause :
-		    appconn->s_state.terminate_cause ?
-		    appconn->s_state.terminate_cause :
-		    RADIUS_TERMINATE_CAUSE_LOST_CARRIER);
+  {
+    int disconnect_cause = term_cause ? term_cause :
+      (appconn->s_state.terminate_cause ?
+       (int)appconn->s_state.terminate_cause :
+       RADIUS_TERMINATE_CAUSE_LOST_CARRIER);
+    terminate_appconn(appconn, disconnect_cause);
+  }
 
   if (appconn->uplink) {
     struct ippoolm_t *member = (struct ippoolm_t *) appconn->uplink;
@@ -2900,6 +2927,9 @@ static int chilliauth_cb(struct radius_t *radius,
 			 struct radius_packet_t *pack,
 			 struct radius_packet_t *pack_req,
 			 void *cbp) {
+  (void)radius;
+  (void)pack_req;
+  (void)cbp;
 
   struct radius_attr_t *attr = NULL;
   size_t offset = 0;
@@ -3031,6 +3061,9 @@ int cb_radius_acct_conf(struct radius_t *radius,
 			struct radius_packet_t *pack,
 			struct radius_packet_t *pack_req, void *cbp) {
   struct app_conn_t *appconn = (struct app_conn_t*) cbp;
+
+  (void)radius;
+  (void)pack_req;
 
   if (!appconn) {
     syslog(LOG_ERR,"No peer protocol defined");
@@ -3514,11 +3547,11 @@ int cb_radius_coa_ind(struct radius_t *radius, struct radius_packet_t *pack,
     if (!appconn->inuse) { syslog(LOG_ERR, "Connection with inuse == 0!"); }
 
     if (
-            (strlen(appconn->s_state.redir.username) == uattr->l-2 &&
-             !memcmp(appconn->s_state.redir.username, uattr->v.t, uattr->l-2)) &&
+            (strlen(appconn->s_state.redir.username) == (size_t)(uattr->l - 2) &&
+             !memcmp(appconn->s_state.redir.username, uattr->v.t, (size_t)(uattr->l - 2))) &&
             (!sattr ||
-             (strlen(appconn->s_state.sessionid) == sattr->l-2 &&
-              !strncasecmp(appconn->s_state.sessionid, (char*)sattr->v.t, sattr->l-2)))) {
+             (strlen(appconn->s_state.sessionid) == (size_t)(sattr->l - 2) &&
+              !strncasecmp(appconn->s_state.sessionid, (char*)sattr->v.t, (size_t)(sattr->l - 2))))) {
 
 #if(_debug_)
       if (_options.debug)
@@ -4569,10 +4602,14 @@ static int uam_msg(struct redir_msg_t *msg) {
   }
 #endif
 
-  if (ippool_getip(ippool, &ipm, &msg->mdata.address.sin_addr)) {
-    if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): UAM login with unknown IP address: %s", __FUNCTION__, __LINE__, inet_ntoa(msg->mdata.address.sin_addr));
-    return 0;
+  {
+    struct in_addr uam_req_ip = msg->mdata.address.sin_addr;
+
+    if (ippool_getip(ippool, &ipm, &uam_req_ip)) {
+      if (_options.debug)
+        syslog(LOG_DEBUG, "%s(%d): UAM login with unknown IP address: %s", __FUNCTION__, __LINE__, inet_ntoa(msg->mdata.address.sin_addr));
+      return 0;
+    }
   }
 
   if ((appconn  = (struct app_conn_t *)ipm->peer)        == NULL ||
@@ -4685,7 +4722,9 @@ static struct app_conn_t * find_app_conn(struct cmdsock_request *req,
   struct dhcp_conn_t *dhcpconn = 0;
 
   if (req->ip.s_addr) {
-    appconn = dhcp_get_appconn_ip(0, &req->ip);
+    struct in_addr req_ip = req->ip;
+
+    appconn = dhcp_get_appconn_ip(0, &req_ip);
     if (has_criteria)
       *has_criteria = 1;
   } else {
@@ -4997,6 +5036,7 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
 
 #ifdef ENABLE_CHILLIQUERY
 static int cmdsock_accept(void *nullData, int sock) {
+  (void)nullData;
   struct sockaddr_un remote;
   struct cmdsock_request req;
 
@@ -5092,10 +5132,13 @@ static int redir_msg(struct redir_t *this) {
     if (msgresult == sizeof(msg)) {
       if (msg.mtype == REDIR_MSG_STATUS_TYPE) {
 	struct redir_conn_t conn;
+	struct sockaddr_in addr_sa = msg.mdata.address;
+	struct sockaddr_in baddr_sa = msg.mdata.baddress;
+
 	memset(&conn, 0, sizeof(conn));
 	if (cb_redir_getstate(redir,
-			      &msg.mdata.address,
-			      &msg.mdata.baddress,
+			      &addr_sa,
+			      &baddr_sa,
 			      &conn) != -1) {
 	  if (safe_write(socket, &conn, sizeof(conn)) < 0) {
 	    syslog(LOG_ERR, "%s: redir_msg writing", strerror(errno));
@@ -5112,6 +5155,11 @@ static int redir_msg(struct redir_t *this) {
     safe_close(socket);
   }
   return 0;
+}
+
+static int redir_msg_select_cb(void *ctx, int idx) {
+  (void)idx;
+  return redir_msg((struct redir_t *)ctx);
 }
 #endif
 
@@ -5630,7 +5678,7 @@ int chilli_main(int argc, char **argv) {
 
 #ifdef USING_IPC_UNIX
     net_select_reg(&sctx, redir->msgfd, SELECT_READ,
-                   (select_callback)redir_msg, redir, 0);
+                   redir_msg_select_cb, redir, 0);
 #endif
 
     if (!_options.redir) {

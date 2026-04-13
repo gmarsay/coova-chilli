@@ -532,7 +532,7 @@ int main(int argc, char **argv) {
   _options.dnsparanoia = args_info.dnsparanoia_flag;
   _options.radiusoriginalurl = args_info.radiusoriginalurl_flag;
 
-  for (numargs = 0; numargs < args_info.uamallowed_given; ++numargs) {
+  for (numargs = 0; (unsigned)numargs < args_info.uamallowed_given; ++numargs) {
     pass_throughs_from_string(_options.pass_throughs,
 			      MAX_PASS_THROUGHS,
 			      &_options.num_pass_throughs,
@@ -552,7 +552,7 @@ int main(int argc, char **argv) {
 
   if (args_info.uamdomain_given) {
     for (numargs = 0, i=0;
-	 numargs < args_info.uamdomain_given && i < MAX_UAM_DOMAINS;
+	 (unsigned)numargs < args_info.uamdomain_given && i < MAX_UAM_DOMAINS;
 	 ++numargs) {
       char *tb = args_info.uamdomain_arg[numargs];
       char *tok, *str, *ptr = NULL;
@@ -737,7 +737,7 @@ int main(int argc, char **argv) {
   memset(_options.macok, 0, sizeof(_options.macok));
   _options.macoklen = 0;
 
-  for (numargs = 0; numargs < args_info.macallowed_given; ++numargs) {
+  for (numargs = 0; (unsigned)numargs < args_info.macallowed_given; ++numargs) {
 
     char *p1 = NULL;
     char *p2 = NULL;
@@ -760,7 +760,7 @@ int main(int argc, char **argv) {
       }
       else {
 	/* Replace anything but hex and comma with space */
-	for (i=0; i<strlen(p1); i++)
+	for (i = 0; (size_t)i < strlen(p1); i++)
 	  if (!isxdigit((int) p1[i])) p1[i] = 0x20;
 
 	if (sscanf (p1, "%2x %2x %2x %2x %2x %2x",
