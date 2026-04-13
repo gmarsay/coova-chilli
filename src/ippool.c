@@ -203,7 +203,7 @@ int ippool_new(struct ippool_t **this,
 
   /* Parse only first instance of pool for now */
 
-  int i;
+  uint32_t i;
   struct in_addr addr;
   struct in_addr mask;
   struct in_addr stataddr;
@@ -252,7 +252,7 @@ int ippool_new(struct ippool_t **this,
 	return -1;
       }
 
-      if ((end - start) > dynsize) {
+      if ((uint32_t)(end - start) > dynsize) {
 	syslog(LOG_ERR, "Too many IPs between dhcpstart=%d and dhcpend=%d",
                start, end);
 	return -1;
@@ -276,8 +276,8 @@ int ippool_new(struct ippool_t **this,
 	/*
 	 * if only dhcpend is set, ensure only that many
 	 */
-	if (dynsize > end)
-	  dynsize = end;
+	if (dynsize > (uint32_t)end)
+	  dynsize = (uint32_t)end;
 
 	dynsize--;/* no network */
 
@@ -332,7 +332,7 @@ int ippool_new(struct ippool_t **this,
   }
 
   for ((*this)->hashlog = 0;
-       ((1 << (*this)->hashlog) < listsize);
+       (((uint32_t)1u << (unsigned)(*this)->hashlog) < listsize);
        (*this)->hashlog++);
 
   syslog(LOG_DEBUG, "Hashlog %d %d %d", (*this)->hashlog, listsize,

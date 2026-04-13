@@ -149,13 +149,14 @@ ChallengeResponse(u_char *challenge, u_char *pwHash, u_char *response)
 
 u_char *to_unicode(u_char *non_uni) {
   u_char *retUni;
-  int i;
+  size_t i;
+  size_t ulen = strlen((char *)non_uni);
 
-  retUni = (u_char *)calloc(1, (strlen((char *)non_uni)+1)*2);
+  retUni = (u_char *)calloc(1, (ulen + 1) * 2);
 
   if (!retUni) return NULL;
 
-  for (i = 0; i < strlen((char *)non_uni); i++) {
+  for (i = 0; i < ulen; i++) {
     retUni[(2*i)] = non_uni[i];
   }
 
@@ -198,6 +199,8 @@ ChallengeHash(u_char *PeerChallenge, u_char *AuthenticatorChallenge,
   SHA_CTX Context;
   u_char Digest[SHA_DIGEST_LENGTH];
   u_char *Name;
+
+  (void)UserNameLen;
 
   Name = (u_char *)strrchr((char *)UserName, '\\');
   if (NULL == Name)

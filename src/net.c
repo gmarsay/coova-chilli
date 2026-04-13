@@ -281,6 +281,8 @@ int net_select_init(select_ctx *sctx) {
     syslog(LOG_ERR, "%s: !! could not create epoll !!", strerror(errno));
     return -1;
   }
+#else
+  (void)sctx;
 #endif
   return 0;
 }
@@ -442,6 +444,9 @@ int net_select_rmfd(select_ctx *sctx, int fd) {
   if (epoll_ctl(sctx->efd, EPOLL_CTL_DEL, fd, &event))
     syslog(LOG_ERR, "%d Failed to remove fd %d (%d)",
            errno, fd, sctx->efd);
+#else
+  (void)sctx;
+  (void)fd;
 #endif
   return 0;
 }
@@ -460,6 +465,10 @@ int net_select_addfd(select_ctx *sctx, int fd, int evts) {
   if (epoll_ctl(sctx->efd, EPOLL_CTL_ADD, fd, &event))
     syslog(LOG_ERR, "%d Failed to add fd %d (%d)",
            errno, fd, sctx->efd);
+#else
+  (void)sctx;
+  (void)fd;
+  (void)evts;
 #endif
   return 0;
 }
@@ -474,6 +483,10 @@ int net_select_modfd(select_ctx *sctx, int fd, int evts) {
   /*syslog(LOG_DEBUG, "epoll mod %d", fd);*/
   if (epoll_ctl(sctx->efd, EPOLL_CTL_MOD, fd, &event))
     syslog(LOG_ERR, "%s: Failed to watch fd", strerror(errno));
+#else
+  (void)sctx;
+  (void)fd;
+  (void)evts;
 #endif
   return 0;
 }
@@ -610,6 +623,7 @@ int net_run_selected(select_ctx *sctx, int status) {
     sfd->cb(sfd->ctx, sfd->idx);
   }
 #else
+  (void)status;
   for (i=0; i < sctx->count; i++) {
     if (sctx->desc[i].fd) {
 #ifdef USING_POLL
@@ -773,7 +787,7 @@ net_read_eth(net_interface *netif, void *d, size_t dlen) {
             syslog(LOG_DEBUG, "read zero from raw socket");
         }
 
-        if (len > dlen) {
+        if ((size_t)len > dlen) {
           syslog(LOG_WARNING, "data truncated %zu/%zd, sending ICMP error",
 		 len, dlen);
           return -1;
@@ -855,7 +869,7 @@ ssize_t net_write_eth(net_interface *netif, void *d, size_t dlen, struct sockadd
 #endif
 #ifdef EMSGSIZE
       case EMSGSIZE:
-        if (dlen > netif->mtu)
+        if (dlen > (size_t)netif->mtu)
           net_set_mtu(netif, dlen);
         break;
 #endif
@@ -1024,6 +1038,9 @@ int net_open_nfqueue(net_interface *netif, u_int16_t q, int (*cb)()) {
 
   return 0;
 #else
+  (void)netif;
+  (void)q;
+  (void)cb;
   syslog(LOG_ERR, "Not implemeneted; build with --with-nfqueue");
   return -1;
 #endif
@@ -1507,6 +1524,9 @@ int net_open_eth(net_interface *netif) {
 #endif
 
 void net_run(net_interface *iface) {
+#ifndef USING_MMAP
+  (void)iface;
+#endif
 #ifdef USING_MMAP
   if (iface->is_active) {
     int ret = send(iface->fd, NULL, 0, MSG_DONTWAIT | MSG_NOSIGNAL);

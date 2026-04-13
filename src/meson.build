@@ -32,6 +32,9 @@ openssl_opt = get_option('openssl')
 if openssl_opt
   ssl_dep = dependency('openssl', required: true)
   conf.set10('HAVE_OPENSSL', true)
+  # OpenSSL 3 marque MD5/SHA1/DES/ENGINE comme dépréciés ; le code historique
+  # utilise encore ces API bas niveau (EVP serait une refonte large).
+  add_project_arguments('-Wno-deprecated-declarations', language: 'c')
 else
   ssl_dep = declare_dependency()
 endif

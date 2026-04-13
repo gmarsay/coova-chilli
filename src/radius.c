@@ -49,6 +49,9 @@ void radius_addnasip(struct radius_t *radius, struct radius_packet_t *pack)  {
 void radius_addcalledstation(struct radius_t *this,
                              struct radius_packet_t *pack,
                              struct session_state *state)  {
+#ifndef ENABLE_PROXYVSA
+  (void)state;
+#endif
   uint8_t b[32];
   uint8_t *mac = NULL;
 
@@ -111,6 +114,7 @@ int radius_hmac_md5(struct radius_t *this, struct radius_packet_t *pack,
 		    char *secret, int secretlen, uint8_t *dst) {
   unsigned char digest[RADIUS_MD5LEN];
   size_t length;
+  size_t i;
 
   MD5_CTX context;
 
@@ -120,7 +124,8 @@ int radius_hmac_md5(struct radius_t *this, struct radius_packet_t *pack,
   unsigned char k_ipad[65];
   unsigned char k_opad[65];
   unsigned char tk[RADIUS_MD5LEN];
-  int i;
+
+  (void)this;
 
   if (secretlen > 64) { /* TODO: If Microsoft truncate to 64 instead */
     MD5Init(&context);
@@ -139,7 +144,7 @@ int radius_hmac_md5(struct radius_t *this, struct radius_packet_t *pack,
   memset(k_ipad, 0x36, sizeof k_ipad);
   memset(k_opad, 0x5c, sizeof k_opad);
 
-  for (i=0; i<key_len; i++) {
+  for (i = 0; i < key_len; i++) {
     k_ipad[i] ^= key[i];
     k_opad[i] ^= key[i];
   }
@@ -193,6 +198,7 @@ int radius_authresp_authenticator(struct radius_t *this,
                                   struct radius_packet_t *pack,
                                   uint8_t *req_auth,
                                   char *secret, size_t secretlen) {
+  (void)this;
 
   /* From RFC 2865: Authenticator is the MD5 hash of:
      Code + Identifier + Length + request authenticator + request attributes +
@@ -970,6 +976,8 @@ int radius_keydecode(struct radius_t *this,
   int blocks;
   int i, n;
 
+  (void)this;
+
   if (srclen < 18) {
     syslog(LOG_ERR, "radius_keydecode MPPE attribute content len must be at least 18, len=%zd", srclen);
     return -1;
@@ -1098,6 +1106,8 @@ int radius_pwdecode(struct radius_t *this,
   MD5_CTX context;
   unsigned char output[RADIUS_MD5LEN];
 
+  (void)this;
+
 #if(_debug_ > 1)
   syslog(LOG_DEBUG, "pw decode secret=%s", secret);
 #endif
@@ -1145,7 +1155,7 @@ int radius_pwdecode(struct radius_t *this,
     dst[i] = src[i] ^ output[i];
 
   /* Continue with the remaining octets of passwd if any */
-  for (n = RADIUS_MD5LEN; n < 128 && n < *dstlen; n += RADIUS_MD5LEN) {
+  for (n = RADIUS_MD5LEN; n < 128 && (size_t)n < *dstlen; n += RADIUS_MD5LEN) {
     MD5Init(&context);
     MD5Update(&context, (uint8_t*) secret, secretlen);
     MD5Update(&context, src + n - RADIUS_MD5LEN, RADIUS_MD5LEN);
@@ -1180,10 +1190,11 @@ int radius_pwencode(struct radius_t *this,
 		    uint8_t *src, size_t srclen,
 		    uint8_t *authenticator,
 		    char *secret, size_t secretlen) {
-
   unsigned char output[RADIUS_MD5LEN];
   MD5_CTX context;
   size_t i, n;
+
+  (void)this;
 
 #if(_debug_ > 1)
   syslog(LOG_DEBUG, "pw encode secret=%s", secret);
@@ -1796,6 +1807,8 @@ int radius_decaps(struct radius_t *this, int idx) {
   void *cbp = NULL;
   struct sockaddr_in addr;
   socklen_t fromlen = sizeof(addr);
+
+  (void)idx;
 
   if ((status = recvfrom(this->fd, &pack, sizeof(pack), 0,
 			 (struct sockaddr *) &addr, &fromlen)) <= 0) {

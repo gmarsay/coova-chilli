@@ -111,7 +111,7 @@ int get_urlparts(char *src, char *host, int hostsize, int *port, int *uripos) {
   host[hostlen] = 0;
 
   if (uripos) {
-    *uripos = slash ? (slash - src) : strlen(src);
+    *uripos = slash ? (size_t)(slash - src) : strlen(src);
   }
 
   return 0;

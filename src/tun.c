@@ -326,7 +326,7 @@ int tun_nlattr(struct nlmsghdr *n, int nsize, int type, void *d, size_t dlen) {
   size_t len = RTA_LENGTH(dlen);
   size_t alen = NLMSG_ALIGN(n->nlmsg_len);
   struct rtattr *rta = (struct rtattr*) (((void*)n) + alen);
-  if (alen + len > nsize)
+  if (alen + len > (size_t)nsize)
     return -1;
   rta->rta_len = len;
   rta->rta_type = type;
@@ -793,7 +793,7 @@ static int tun_decaps_cb(void *ctx, struct pkt_buffer *pb) {
       return -1;
     }
 
-    if ((int)ntohs(iph->tot_len) + ethsize > length) {
+    if ((size_t)((int)ntohs(iph->tot_len) + ethsize) > length) {
       if (_options.debug)
         syslog(LOG_DEBUG, "dropping ip packet; ip-len=%d + eth-hdr=%d > read-len=%d",
                (int)ntohs(iph->tot_len),
@@ -899,6 +899,9 @@ int tun_write(struct tun_t *tun, uint8_t *pack, size_t len, int idx) {
   }
 #endif
 
+#ifndef ENABLE_MULTIROUTE
+  (void)idx;
+#endif
   return safe_write(tun(tun, idx).fd, pack, len);
 
 #endif

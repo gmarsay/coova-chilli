@@ -34,6 +34,7 @@ static inline void options_md5(struct options_t *o, uint8_t *cksum) {
 /* Get IP address and mask */
 int option_aton(struct in_addr *addr, struct in_addr *mask,
 		char *pool, int number) {
+  (void)number;
 
   /* Parse only first instance of network for now */
   /* Eventually "number" will indicate the token which we want to parse */
@@ -65,8 +66,8 @@ int option_aton(struct in_addr *addr, struct in_addr *mask,
         return -1; /* Wrong mask format */
       }
       m = m1 * 0x1000000 + m2 * 0x10000 + m3 * 0x100 + m4;
-      for (masklog = 0; ((1 << masklog) < ((~m)+1)); masklog++);
-      if (((~m)+1) != (1 << masklog)) {
+      for (masklog = 0; ((1u << (unsigned)masklog) < ((~m) + 1u)); masklog++);
+      if (((~m) + 1u) != (1u << (unsigned)masklog)) {
         syslog(LOG_ERR, "Invalid mask");
         return -1; /* Wrong mask format (not all ones followed by all zeros)*/
       }
@@ -230,7 +231,7 @@ int options_fromfd(int fd, bstring bt) {
     if (rd == sizeof(len)) {
       ballocmin(bt, len);
       rd = safe_read(fd, bt->data, len);
-      if (rd == len) {
+      if ((size_t)rd == len) {
 	has_error = 0;
       }
       rd = safe_read(fd, cksum_check, sizeof(cksum_check));
@@ -548,6 +549,7 @@ int options_binload(char *file) {
 }
 
 int process_options(int argc, char **argv, int minimal) {
+  (void)minimal;
 
   /*
    *  If ran with arguments besides the load file, then pass

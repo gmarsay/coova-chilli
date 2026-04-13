@@ -52,8 +52,7 @@ void garden_print_list(int fd, pass_through *ptlist, int ptcnt) {
 #endif
 		  );
 
-    if (!safe_write(fd, line, strlen(line))) /* error */
-      ;
+    if (!safe_write(fd, line, strlen(line))) { /* ignore write error */ }
   }
 }
 
@@ -72,8 +71,7 @@ void garden_print(int fd) {
 		"static garden (%d/%d):\n",
 		_options.num_pass_throughs,
 		MAX_PASS_THROUGHS);
-  if (!safe_write(fd, line, strlen(line))) /* error */
-    ;
+  if (!safe_write(fd, line, strlen(line))) { /* ignore write error */ }
 
 #ifdef HAVE_PATRICIA
   if (dhcp->ptree) {
@@ -88,8 +86,7 @@ void garden_print(int fd) {
 		"dynamic garden (%d/%d):\n",
 		dhcp->num_pass_throughs,
 		MAX_PASS_THROUGHS);
-  if (!safe_write(fd, line, strlen(line))) /* error */
-    ;
+  if (!safe_write(fd, line, strlen(line))) { /* ignore write error */ }
 
 #ifdef HAVE_PATRICIA
   if (dhcp->ptree_dyn) {
@@ -105,8 +102,7 @@ void garden_print(int fd) {
 		"authed garden (%d/%d):\n",
 		_options.num_authed_pass_throughs,
 		MAX_PASS_THROUGHS);
-  if (!safe_write(fd, line, strlen(line))) /* error */
-    ;
+  if (!safe_write(fd, line, strlen(line))) { /* ignore write error */ }
 
 #ifdef HAVE_PATRICIA
   if (dhcp->ptree_authed) {
@@ -309,7 +305,7 @@ int garden_check(pass_through *ptlist, uint32_t *pcnt,
 		 ) {
   uint32_t ptcnt = *pcnt;
   pass_through *pt;
-  int i;
+  uint32_t i;
 
   for (i = 0; i < ptcnt; i++) {
     pt = &ptlist[i];
@@ -341,14 +337,14 @@ int pass_through_rem(pass_through *ptlist, uint32_t *ptcnt,
 #endif
 		     ) {
   uint32_t cnt = *ptcnt;
-  int i;
+  uint32_t i;
 
   for (i=0; i < cnt; i++) {
     if (pt_equal(&ptlist[i], pt)) {
       if (_options.debug) {
-        syslog(LOG_DEBUG, "%s(%d): Uamallowed removing #%d: proto=%d host=%s port=%d", __FUNCTION__, __LINE__,
-               i, pt->proto, inet_ntoa(pt->host), pt->port);
-        syslog(LOG_DEBUG, "%s(%d): Shifting uamallowed list %d to %d", __FUNCTION__, __LINE__, i, cnt);
+        syslog(LOG_DEBUG, "%s(%d): Uamallowed removing #%u: proto=%d host=%s port=%d", __FUNCTION__, __LINE__,
+               (unsigned)i, pt->proto, inet_ntoa(pt->host), pt->port);
+        syslog(LOG_DEBUG, "%s(%d): Shifting uamallowed list %u to %u", __FUNCTION__, __LINE__, (unsigned)i, (unsigned)cnt);
       }
       for (; i < cnt-1; i++)
 	memcpy(&ptlist[i], &ptlist[i+1], sizeof(pass_through));
@@ -373,16 +369,16 @@ int pass_through_add(pass_through *ptlist, uint32_t ptlen,
 #endif
 		     ) {
   uint32_t cnt = *ptcnt;
-  int i;
+  uint32_t i;
 
   for (i=0; i < cnt; i++) {
     if (pt_equal(&ptlist[i], pt)) {
       if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): Uamallowed already exists #%d:%d: proto=%d host=%s port=%d", __FUNCTION__, __LINE__,
-               i, ptlen, pt->proto, inet_ntoa(pt->host), pt->port);
+        syslog(LOG_DEBUG, "%s(%d): Uamallowed already exists #%u:%u: proto=%d host=%s port=%d", __FUNCTION__, __LINE__,
+               (unsigned)i, (unsigned)ptlen, pt->proto, inet_ntoa(pt->host), pt->port);
       if (is_dyn) {
         if (_options.debug)
-          syslog(LOG_DEBUG, "%s(%d): Shifting uamallowed list %d to %d", __FUNCTION__, __LINE__, i, cnt);
+          syslog(LOG_DEBUG, "%s(%d): Shifting uamallowed list %u to %u", __FUNCTION__, __LINE__, (unsigned)i, (unsigned)cnt);
 	for (; i<cnt-1; i++)
 	  memcpy(&ptlist[i], &ptlist[i+1], sizeof(pass_through));
 	cnt = *ptcnt = *ptcnt - 1;
@@ -401,7 +397,7 @@ int pass_through_add(pass_through *ptlist, uint32_t ptlen,
     }
 
     if (_options.debug)
-      syslog(LOG_DEBUG, "%s(%d): Shifting uamallowed list %d to %d", __FUNCTION__, __LINE__, i, ptlen);
+      syslog(LOG_DEBUG, "%s(%d): Shifting uamallowed list %u to %u", __FUNCTION__, __LINE__, (unsigned)i, (unsigned)ptlen);
     for (i=0; i<ptlen-1; i++)
       memcpy(&ptlist[i], &ptlist[i+1], sizeof(pass_through));
 
@@ -409,8 +405,8 @@ int pass_through_add(pass_through *ptlist, uint32_t ptlen,
   }
 
   if (_options.debug)
-    syslog(LOG_DEBUG, "%s(%d): Uamallowed IP address #%d:%d: proto=%d host=%s port=%d", __FUNCTION__, __LINE__,
-           cnt, ptlen, pt->proto, inet_ntoa(pt->host), pt->port);
+    syslog(LOG_DEBUG, "%s(%d): Uamallowed IP address #%u:%u: proto=%d host=%s port=%d", __FUNCTION__, __LINE__,
+           (unsigned)cnt, (unsigned)ptlen, pt->proto, inet_ntoa(pt->host), pt->port);
 
   memcpy(&ptlist[cnt], pt, sizeof(pass_through));
   *ptcnt = cnt + 1;

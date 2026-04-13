@@ -3120,8 +3120,7 @@ int redir_main(struct redir_t *redir,
         msg.mtype = REDIR_MACREAUTH;
         redir_msg_send(0);
       }
-      /* drop down */
-
+      __attribute__((fallthrough));
     case REDIR_PRELOGIN:
       /* Did the challenge expire? */
       if (!conn.s_state.uamtime ||

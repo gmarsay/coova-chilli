@@ -917,7 +917,7 @@ int chilli_new_conn(struct app_conn_t **conn) {
   return 0; /* Success */
 }
 
-int static freeconn(struct app_conn_t *conn) {
+static int freeconn(struct app_conn_t *conn) {
   int n = conn->unit;
 
 #ifdef ENABLE_GARDENACCOUNTING
@@ -1182,7 +1182,7 @@ void chilli_freeconn(void) {
 }
 
 /* Kill all connections and send Radius Acct Stop */
-int static killconn(void) {
+static int killconn(void) {
   struct app_conn_t *conn;
 
   for (conn = firstusedconn; conn; conn = conn->next) {
@@ -1205,7 +1205,7 @@ int static killconn(void) {
 }
 
 /* Compare a MAC address to the addresses given in the macallowed option */
-int static maccmp(unsigned char *mac) {
+static int maccmp(unsigned char *mac) {
   int i;
 
   for (i=0; i<_options.macoklen; i++)
@@ -1395,7 +1395,7 @@ int chilli_auth_radius(struct radius_t *radius) {
   return radius_req(radius, &radius_pack, &admin_session);
 }
 
-int static auth_radius(struct app_conn_t *appconn,
+static int auth_radius(struct app_conn_t *appconn,
 		       char *username, char *password,
 		       uint8_t *dhcp_pkt, size_t dhcp_len) {
   struct dhcp_conn_t *dhcpconn = (struct dhcp_conn_t *)appconn->dnlink;
@@ -1540,8 +1540,7 @@ static int acct_req(acct_type type,
 
     case RADIUS_STATUS_TYPE_INTERIM_UPDATE:
       conn->s_state.interim_time = mainclock.tv_sec;
-      /* drop through */
-
+      __attribute__((fallthrough));
     case RADIUS_STATUS_TYPE_STOP:
       switch(type) {
 #ifdef ENABLE_GARDENACCOUNTING
@@ -1883,7 +1882,7 @@ int dnprot_reject(struct app_conn_t *appconn) {
   }
 }
 
-int static dnprot_challenge(struct app_conn_t *appconn) {
+static int dnprot_challenge(struct app_conn_t *appconn) {
 
   switch (appconn->dnprot) {
 
@@ -4557,7 +4556,7 @@ int cb_dhcp_eap_ind(struct dhcp_conn_t *conn, uint8_t *pack, size_t len) {
  *
  ***********************************************************/
 
-int static uam_msg(struct redir_msg_t *msg) {
+static int uam_msg(struct redir_msg_t *msg) {
 
   struct ippoolm_t *ipm;
   struct app_conn_t *appconn = NULL;
@@ -5083,7 +5082,7 @@ int chilli_io(int fd_ctrl_r, int fd_ctrl_w, int fd_pkt_r, int fd_pkt_w) {
 #endif
 
 #ifdef USING_IPC_UNIX
-int static redir_msg(struct redir_t *this) {
+static int redir_msg(struct redir_t *this) {
   struct redir_msg_t msg;
   struct sockaddr_un remote;
   socklen_t len = sizeof(remote);

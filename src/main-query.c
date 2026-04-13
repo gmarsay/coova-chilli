@@ -350,7 +350,7 @@ static int chilli_communicate(int s,
   char line[1024];
   int len;
 
-  if (safe_write(s, buffer, blen) != blen) {
+  if (safe_write(s, buffer, blen) != (ssize_t)blen) {
     perror("write");
     return -1;
   }
@@ -455,7 +455,7 @@ int main(int argc, char **argv) {
           argidx = process_args(argc, argv, argidx);
           if (request.type != CMDSOCK_LOGOUT || argidx >= argc)
             break;
-          /* else, drop through */
+          __attribute__((fallthrough));
         case CMDSOCK_DHCP_DROP:
         case CMDSOCK_DHCP_RELEASE:
           {
@@ -565,7 +565,7 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  for (i=0 ; i < globbuf.gl_pathc; i++) {
+  for (i = 0; (size_t)i < globbuf.gl_pathc; i++) {
     cmdsock = globbuf.gl_pathv[i];
     if (globbuf.gl_pathc>1) {
       char header[256];

@@ -63,7 +63,7 @@ static int chilliauth_cb(struct radius_t *radius,
   return 0;
 }
 
-int static chilliauth() {
+static int chilliauth() {
   unsigned char hwaddr[6];
   struct radius_t *radius=0;
   struct timeval idleTime;

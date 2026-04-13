@@ -354,8 +354,12 @@ openssl_error(openssl_con *con, int ret, char *func) {
       case SSL_ERROR_WANT_WRITE: return 2;
       case SSL_ERROR_SYSCALL:
         if (ret == 0) return 0;
-      case SSL_ERROR_ZERO_RETURN: openssl_shutdown(con, 0);
-      case SSL_ERROR_SSL: return -1;
+        __attribute__((fallthrough));
+      case SSL_ERROR_ZERO_RETURN:
+        openssl_shutdown(con, 0);
+        __attribute__((fallthrough));
+      case SSL_ERROR_SSL:
+        return -1;
       default: break;
     }
     return 1;
@@ -438,7 +442,7 @@ openssl_write(openssl_con *con, char *b, int l, int t) {
     if (!FD_ISSET(fd, &wfds)) return 0;
   }
 
-  while (sent < l) {
+  while (sent < (size_t)l) {
 
  repeat_write:
 

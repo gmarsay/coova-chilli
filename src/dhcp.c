@@ -999,12 +999,12 @@ int dhcp_reserve_str(char *b, size_t blen) {
 
   char *bp = b;
   char *t = NULL;
-  int i = 0;
+  size_t i = 0;
 
   memset(mac, 0, sizeof(mac));
   memset(tmp, 0, sizeof(tmp));
 
-  for (i=0; state >= 0 && i < blen; i++) {
+  for (i = 0; state >= 0 && i < blen; i++) {
     newline = 0;
     switch(b[i]) {
       case '#':
@@ -1016,12 +1016,14 @@ int dhcp_reserve_str(char *b, size_t blen) {
         }
       case '\n':
         lineno++;
+        __attribute__((fallthrough));
       case '\r': case ',':
         {
           if (state==-1)
             state = 0;
           newline = 1;
         }
+        __attribute__((fallthrough));
       case ' ': case '\t': case '=':
         {
           b[i]=0;
@@ -1430,7 +1432,7 @@ static
 int dhcp_dns(struct dhcp_conn_t *conn, uint8_t *pack,
 	     size_t *plen, char isReq) {
 
-  if (*plen < DHCP_DNS_HLEN + sizeofudp(pack)) {
+  if (*plen < (size_t)(DHCP_DNS_HLEN + sizeofudp(pack))) {
 
     if (_options.debug)
       syslog(LOG_DEBUG, "%s(%d): bad DNS packet of length %zu", __FUNCTION__, __LINE__, *plen);
@@ -3097,8 +3099,7 @@ int dhcp_getreq(struct dhcp_ctx *ctx, uint8_t *pack, size_t len) {
     case DHCPDECLINE:
       if (_options.debug)
         syslog(LOG_DEBUG, "%s(%d): DHCP-Decline", __FUNCTION__, __LINE__);
-      /* drop through */
-
+      __attribute__((fallthrough));
     case DHCPRELEASE:
       dhcp_release_mac(this, mac, RADIUS_TERMINATE_CAUSE_LOST_CARRIER);
 
@@ -4333,7 +4334,7 @@ int dhcp_decaps_cb(void *pctx, struct pkt_buffer *pb) {
 
   int min_length = sizeof(struct pkt_ethhdr_t);
 
-  if (length < min_length) {
+  if (length < (size_t)min_length) {
     if (_options.debug)
       syslog(LOG_DEBUG, "%s(%d): bad packet length %zu", __FUNCTION__, __LINE__, length);
     return 0;
