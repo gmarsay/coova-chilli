@@ -300,6 +300,7 @@ foreach e : [
   ['chilli_response', files('main-response.c')],
   ['chilli_radconfig', files('main-radconfig.c')],
   ['chilli_query', files('main-query.c')],
+  ['chilli_redir', files('main-redir.c')],
 ]
   executable(
     e[0],
