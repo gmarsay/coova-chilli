@@ -561,7 +561,6 @@ int pass_throughs_from_string(pass_through *ptlist, uint32_t ptlen,
   return 0;
 }
 
-#ifdef ENABLE_CHILLIREDIR
 int regex_pass_throughs_from_string(regex_pass_through *ptlist, uint32_t ptlen,
 				    uint32_t *ptcnt, char *s,
 				    char is_dyn) {
@@ -599,4 +598,3 @@ int regex_pass_throughs_from_string(regex_pass_through *ptlist, uint32_t ptlen,
   *ptcnt = cnt + 1;
   return 0;
 }
-#endif

@@ -283,6 +283,7 @@ int options_fromfd(int fd, bstring bt) {
   if (!option_s_l(bt, &o.locationname)) return 0;
 
   if (!option_s_l(bt, &o.dhcpif)) return 0;
+  if (!option_s_l(bt, &o.dhcpsocket)) return 0;
 #ifdef ENABLE_MULTILAN
   for (i=0; i < MAX_MOREIF; i++) {
     if (!option_s_l(bt, &o.moreif[i].dhcpif)) return 0;
@@ -348,7 +349,6 @@ int options_fromfd(int fd, bstring bt) {
 #include EX_OPTIONS_LOAD
 #endif
 
-#ifdef ENABLE_CHILLIREDIR
   for (i = 0; i < MAX_REGEX_PASS_THROUGHS; i++) {
 #if defined (__linux__) || defined (__FreeBSD__) || defined (__APPLE__) || defined (__OpenBSD__) || defined (__NetBSD__)
     regfree(&_options.regex_pass_throughs[i].re_host);
@@ -363,7 +363,6 @@ int options_fromfd(int fd, bstring bt) {
       regfree(&_options.regex_pass_throughs[i].re_qs);
 #endif
   }
-#endif
 
   if (_options._data) free(_options._data);
   memcpy(&_options, &o, sizeof(o));
@@ -390,13 +389,11 @@ int options_save(char *file, bstring bt) {
 
   memcpy(&o, &_options, sizeof(o));
 
-#ifdef ENABLE_CHILLIREDIR
   for (i = 0; i < MAX_REGEX_PASS_THROUGHS; i++) {
     memset(&o.regex_pass_throughs[i].re_host, 0, sizeof(regex_t));
     memset(&o.regex_pass_throughs[i].re_path, 0, sizeof(regex_t));
     memset(&o.regex_pass_throughs[i].re_qs, 0, sizeof(regex_t));
   }
-#endif
 
   if (!option_s_s(bt, &o.binconfig)) return 0;
   if (!option_s_s(bt, &o.pidfile)) return 0;
@@ -428,6 +425,7 @@ int options_save(char *file, bstring bt) {
   if (!option_s_s(bt, &o.locationname)) return 0;
 
   if (!option_s_s(bt, &o.dhcpif)) return 0;
+  if (!option_s_s(bt, &o.dhcpsocket)) return 0;
 #ifdef ENABLE_MULTILAN
   for (i=0; i < MAX_MOREIF; i++) {
     if (!option_s_s(bt, &o.moreif[i].dhcpif)) return 0;

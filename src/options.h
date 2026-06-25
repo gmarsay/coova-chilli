@@ -100,6 +100,7 @@ struct options_t {
 
   /* DHCP parameters */
   char *dhcpif;                  /* Interface: eth1 */
+  char *dhcpsocket;              /* Path for chilli_dhcp IPC socket */
   char *routeif;                 /* Interface: eth0 (optional) */
   uint8_t dhcpmac[PKT_ETH_ALEN]; /* Interface MAC address */
   struct in_addr dhcplisten;     /* IP address to listen to */
@@ -249,10 +250,8 @@ struct options_t {
   uint32_t num_authed_pass_throughs;
 #endif
 
-#ifdef ENABLE_CHILLIREDIR
   regex_pass_through regex_pass_throughs[MAX_REGEX_PASS_THROUGHS];
   uint32_t regex_num_pass_throughs;
-#endif
 
   char* captiveportalapi_uri; /* RFC 8910 Captive Portal API URI, nullptr if not used. */
 

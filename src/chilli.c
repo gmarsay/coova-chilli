@@ -20,11 +20,17 @@
 
 #include "chilli.h"
 #include "bstrlib.h"
+#include "dhcpipc.h"
+#include "ipt_filter.h"
 struct tun_t *tun;                /* TUN instance            */
 struct ippool_t *ippool;          /* Pool of IP addresses */
 struct radius_t *radius;          /* Radius client instance */
 struct dhcp_t *dhcp = NULL;       /* DHCP instance */
 struct redir_t *redir = NULL;     /* Redir instance */
+
+static int dhcp_ipc_srv_fd = -1;  /* reçoit NEW_CLIENT/GONE de chilli_dhcp */
+static int dhcp_ipc_cli_fd = -1;  /* envoie SET_AUTHSTATE/KICK vers chilli_dhcp */
+static char dhcp_ipc_dhcpd_path[108]; /* chemin du socket de chilli_dhcp */
 
 #ifdef ENABLE_MULTIROUTE
 #include "rtmon.h"
@@ -57,15 +63,16 @@ static int acct_req(acct_type type,
 		    struct app_conn_t *conn,
 		    uint8_t status_type);
 
+void dhcp_ipc_resync_all(void);
+
 static pid_t chilli_pid = 0;
+pid_t dhcp_pid = 0;
 
 #ifdef ENABLE_CHILLIRADSEC
 static pid_t radsec_pid = 0;
 #endif
 
-#ifdef ENABLE_CHILLIREDIR
 static pid_t redir_pid = 0;
-#endif
 
 typedef struct child {
   pid_t pid;
@@ -131,7 +138,6 @@ int child_remove_pid(pid_t pid) {
   return -1;
 }
 
-#if defined(ENABLE_CHILLIREDIR) || defined(ENABLE_CHILLIRADSEC)
 static pid_t launch_daemon(char *name, char *path) {
   pid_t cpid = getpid();
   pid_t p = chilli_fork(CHILLI_PROC_DAEMON, name);
@@ -166,19 +172,20 @@ static pid_t launch_daemon(char *name, char *path) {
 
   return 0;
 }
-#endif
 
-#ifdef ENABLE_CHILLIREDIR
 static void launch_chilliredir(void) {
   redir_pid = launch_daemon("[chilli_redir]", SBINDIR "/chilli_redir");
 }
-#endif
 
 #ifdef ENABLE_CHILLIRADSEC
 static void launch_chilliradsec(void) {
   radsec_pid = launch_daemon("[chilli_radsec]", SBINDIR "/chilli_radsec");
 }
 #endif
+
+void launch_chilli_dhcp(void) {
+  dhcp_pid = launch_daemon("[chilli_dhcp]", SBINDIR "/chilli_dhcp");
+}
 
 static int proc_status(char *name, pid_t pid) {
   char buffer[128];
@@ -304,12 +311,15 @@ static void _sigchld(int signum) {
       launch_chilliradsec();
     }
 #endif
-#ifdef ENABLE_CHILLIREDIR
     if (redir_pid > 0 && redir_pid == pid) {
       syslog(LOG_ERR, "Having to re-launch chilli_redir... PID %d exited", pid);
       launch_chilliredir();
     }
-#endif
+    if (dhcp_pid > 0 && dhcp_pid == pid) {
+      syslog(LOG_ERR, "Having to re-launch chilli_dhcp... PID %d exited", pid);
+      launch_chilli_dhcp();
+      dhcp_ipc_resync_all();
+    }
     if (child_remove_pid(pid) == 0)
       child_count--;
   }
@@ -335,10 +345,8 @@ static void _sigusr1(int signum) {
   if (p_reload_config)
     *p_reload_config = 1;
 
-#ifdef ENABLE_CHILLIREDIR
   if (redir_pid)
     kill(redir_pid, SIGUSR1);
-#endif
 
 #ifdef ENABLE_CHILLIRADSEC
   if (radsec_pid)
@@ -1034,15 +1042,20 @@ static int dnprot_terminate(struct app_conn_t *appconn) {
 #ifdef ENABLE_EAPOL
       case DNPROT_EAPOL:
 #endif
-        if (appconn->dnlink)
-          ((struct dhcp_conn_t*) appconn->dnlink)->authstate = DHCP_AUTH_NONE;
+        ipt_filter_del_authed(&appconn->hisip);
+        if (dhcp_ipc_cli_fd >= 0)
+          dhcpipc_send_authstate(dhcp_ipc_cli_fd, dhcp_ipc_dhcpd_path,
+                                 appconn->hismac, appconn->hisip.s_addr,
+                                 DHCP_AUTH_NONE);
         break;
       case DNPROT_MAC:
       case DNPROT_UAM:
       case DNPROT_DHCP_NONE:
       case DNPROT_NULL:
-        if (appconn->dnlink)
-          ((struct dhcp_conn_t*) appconn->dnlink)->authstate = DHCP_AUTH_DNAT;
+        if (dhcp_ipc_cli_fd >= 0)
+          dhcpipc_send_authstate(dhcp_ipc_cli_fd, dhcp_ipc_dhcpd_path,
+                                 appconn->hismac, appconn->hisip.s_addr,
+                                 DHCP_AUTH_DNAT);
         break;
       default:
         syslog(LOG_ERR, "Unknown downlink protocol");
@@ -1137,7 +1150,6 @@ void session_interval(struct app_conn_t *conn) {
 
 static int checkconn(void) {
   struct app_conn_t *conn;
-  struct dhcp_conn_t* dhcpconn;
   uint32_t checkdiff;
   uint32_t rereaddiff;
 
@@ -1160,10 +1172,6 @@ static int checkconn(void) {
 
   for (conn = firstusedconn; conn; conn=conn->next) {
     if (conn->inuse != 0) {
-      if (!(dhcpconn = (struct dhcp_conn_t *)conn->dnlink)) {
-	syslog(LOG_WARNING, "No downlink protocol");
-	continue;
-      }
       session_interval(conn);
     }
   }
@@ -1182,13 +1190,10 @@ static int checkconn(void) {
 
 void chilli_freeconn(void) {
   struct app_conn_t *conn, *c;
-  struct dhcp_conn_t *d = NULL;
 
   for (conn = firstusedconn; conn; ) {
     c = conn;
     conn = conn->next;
-    d = (struct dhcp_conn_t *)c->dnlink;
-    if (d) d->peer = NULL;
     free(c);
   }
 
@@ -1416,8 +1421,6 @@ int chilli_auth_radius(struct radius_t *radius) {
 static int auth_radius(struct app_conn_t *appconn,
 		       char *username, char *password,
 		       uint8_t *dhcp_pkt, size_t dhcp_len) {
-  struct dhcp_conn_t *dhcpconn = (struct dhcp_conn_t *)appconn->dnlink;
-
   (void)dhcp_pkt;
   (void)dhcp_len;
   struct radius_packet_t radius_pack;
@@ -1436,7 +1439,7 @@ static int auth_radius(struct app_conn_t *appconn,
   }
 
   /* Include his MAC address */
-  snprintf(mac, sizeof(mac), MAC_FMT, MAC_ARG(dhcpconn->hismac));
+  snprintf(mac, sizeof(mac), MAC_FMT, MAC_ARG(appconn->hismac));
 
   if (!username) {
 
@@ -1822,12 +1825,6 @@ int chilli_assign_snat(struct app_conn_t *appconn, int force) {
 
   if (ippool_newip(ippool, &newipm, &appconn->natip, 0)) {
     syslog(LOG_ERR, "Failed to allocate SNAT IP address");
-    /*
-     *  Clean up the static pool listing too, it's misconfigured now.
-     */
-    if (appconn->dnlink) {
-      dhcp_freeconn((struct dhcp_conn_t *)appconn->dnlink, 0);
-    }
     return -1;
   }
 
@@ -1850,21 +1847,17 @@ int chilli_assign_snat(struct app_conn_t *appconn, int force) {
  ***********************************************************/
 
 int dnprot_reject(struct app_conn_t *appconn) {
-  struct dhcp_conn_t* dhcpconn = NULL;
-  /*struct ippoolm_t *ipm;*/
-
   if (appconn->is_adminsession) return 0;
 
   switch (appconn->dnprot) {
 
 #ifdef ENABLE_EAPOL
     case DNPROT_EAPOL:
-      if (!(dhcpconn = (struct dhcp_conn_t*) appconn->dnlink)) {
-        syslog(LOG_ERR, "No downlink protocol");
-        return 0;
-      }
-
-      dhcp_sendEAPreject(dhcpconn, NULL, 0);
+      /* EAPOL reject: chilli_dhcp handles the EAP exchange */
+      if (dhcp_ipc_cli_fd >= 0)
+        dhcpipc_send_authstate(dhcp_ipc_cli_fd, dhcp_ipc_dhcpd_path,
+                               appconn->hismac, appconn->hisip.s_addr,
+                               DHCP_AUTH_NONE);
       return 0;
 #endif
 
@@ -1878,18 +1871,19 @@ int dnprot_reject(struct app_conn_t *appconn) {
       if (!appconn->s_state.authenticated)
         strlcpy(appconn->s_state.redir.username, "-", USERNAMESIZE);
 
-      if (!(dhcpconn = (struct dhcp_conn_t *)appconn->dnlink)) {
-        syslog(LOG_ERR, "No downlink protocol");
-        return 0;
-      }
-
       if (_options.macauthdeny) {
-        dhcpconn->authstate = DHCP_AUTH_DROP;
         appconn->dnprot = DNPROT_NULL;
+        if (dhcp_ipc_cli_fd >= 0)
+          dhcpipc_send_authstate(dhcp_ipc_cli_fd, dhcp_ipc_dhcpd_path,
+                                 appconn->hismac, appconn->hisip.s_addr,
+                                 DHCP_AUTH_DROP);
       }
       else {
-        dhcpconn->authstate = DHCP_AUTH_DNAT;
         appconn->dnprot = DNPROT_UAM;
+        if (dhcp_ipc_cli_fd >= 0)
+          dhcpipc_send_authstate(dhcp_ipc_cli_fd, dhcp_ipc_dhcpd_path,
+                                 appconn->hismac, appconn->hisip.s_addr,
+                                 DHCP_AUTH_DNAT);
       }
 
       return 0;
@@ -1904,37 +1898,13 @@ int dnprot_reject(struct app_conn_t *appconn) {
 }
 
 static int dnprot_challenge(struct app_conn_t *appconn) {
-
-  switch (appconn->dnprot) {
-
-#ifdef ENABLE_EAPOL
-    case DNPROT_EAPOL:
-      {
-        struct dhcp_conn_t* dhcpconn = NULL;
-        if (!(dhcpconn = (struct dhcp_conn_t *)appconn->dnlink)) {
-          syslog(LOG_ERR, "No downlink protocol");
-          return 0;
-        }
-
-        dhcp_sendEAP(dhcpconn, appconn->chal, appconn->challen);
-      }
-      break;
-#endif
-
-    case DNPROT_NULL:
-    case DNPROT_UAM:
-    case DNPROT_MAC:
-      break;
-
-    default:
-      syslog(LOG_ERR, "Unknown downlink protocol");
-  }
-
+  /* EAPOL challenge: chilli_dhcp handles EAP packet sending directly */
+  (void)appconn;
   return 0;
 }
 
 int dnprot_accept(struct app_conn_t *appconn) {
-  struct dhcp_conn_t* dhcpconn = NULL;
+  uint8_t new_authstate = DHCP_AUTH_PASS;
 
   if (appconn->is_adminsession) return 0;
 
@@ -1947,77 +1917,29 @@ int dnprot_accept(struct app_conn_t *appconn) {
 
 #ifdef ENABLE_EAPOL
     case DNPROT_EAPOL:
-      if (!(dhcpconn = (struct dhcp_conn_t *)appconn->dnlink)) {
-        syslog(LOG_ERR, "No downlink protocol");
-        return 0;
-      }
-
-      dhcp_set_addrs(dhcpconn,
-                     &appconn->hisip, &appconn->hismask,
-                     &appconn->ourip, &appconn->mask,
-                     &appconn->dns1, &appconn->dns2);
-
-      /* This is the one and only place eapol authentication is accepted */
-
-      dhcpconn->authstate = DHCP_AUTH_PASS;
-
-      /* Tell client it was successful */
-      dhcp_sendEAP(dhcpconn, appconn->chal, appconn->challen);
-
-      syslog(LOG_WARNING, "Do not know how to set encryption keys on this platform!");
+      /* chilli_dhcp handles EAP packet sending */
+      syslog(LOG_WARNING, "EAPOL: EAP success via chilli_dhcp not fully implemented");
+      new_authstate = DHCP_AUTH_PASS;
       break;
 #endif
 
     case DNPROT_UAM:
-      if (!(dhcpconn = (struct dhcp_conn_t *)appconn->dnlink)) {
-        syslog(LOG_ERR, "No downlink protocol");
-        return 0;
-      }
-
-      dhcp_set_addrs(dhcpconn,
-                     &appconn->hisip, &appconn->hismask,
-                     &appconn->ourip, &appconn->mask,
-                     &appconn->dns1, &appconn->dns2);
-
-      /* This is the one and only place UAM authentication is accepted */
-      dhcpconn->authstate = DHCP_AUTH_PASS;
       appconn->s_params.flags &= ~REQUIRE_UAM_AUTH;
+      new_authstate = DHCP_AUTH_PASS;
       break;
 
     case DNPROT_WPA:
-      if (!(dhcpconn = (struct dhcp_conn_t *)appconn->dnlink)) {
-        syslog(LOG_ERR, "No downlink protocol");
-        return 0;
-      }
-
-      dhcp_set_addrs(dhcpconn,
-                     &appconn->hisip, &appconn->hismask,
-                     &appconn->ourip, &appconn->mask,
-                     &appconn->dns1, &appconn->dns2);
-
-      /* This is the one and only place WPA authentication is accepted */
       if (appconn->s_params.flags & REQUIRE_UAM_AUTH) {
         appconn->dnprot = DNPROT_DHCP_NONE;
-        dhcpconn->authstate = DHCP_AUTH_NONE;
+        new_authstate = DHCP_AUTH_NONE;
       }
       else {
-        dhcpconn->authstate = DHCP_AUTH_PASS;
+        new_authstate = DHCP_AUTH_PASS;
       }
-
       break;
 
     case DNPROT_MAC:
-      if (!(dhcpconn = (struct dhcp_conn_t *)appconn->dnlink)) {
-        syslog(LOG_ERR, "No downlink protocol");
-        return 0;
-      }
-
-      dhcp_set_addrs(dhcpconn,
-                     &appconn->hisip, &appconn->hismask,
-                     &appconn->ourip, &appconn->mask,
-                     &appconn->dns1, &appconn->dns2);
-
-      dhcpconn->authstate = DHCP_AUTH_PASS;
+      new_authstate = DHCP_AUTH_PASS;
       break;
 
     case DNPROT_NULL:
@@ -2029,9 +1951,20 @@ int dnprot_accept(struct app_conn_t *appconn) {
       return 0;
   }
 
-  if ((dhcpconn && appconn->s_params.flags & REQUIRE_UAM_SPLASH) ||
-      (dhcpconn && appconn->s_params.flags & REQUIRE_UAM_AUTH))
-    dhcpconn->authstate = DHCP_AUTH_SPLASH;
+  if (appconn->s_params.flags & REQUIRE_UAM_SPLASH ||
+      appconn->s_params.flags & REQUIRE_UAM_AUTH)
+    new_authstate = DHCP_AUTH_SPLASH;
+
+  /* Mettre à jour nftables et notifier chilli_dhcp */
+  if (new_authstate == DHCP_AUTH_PASS)
+    ipt_filter_add_authed(&appconn->hisip);
+  else
+    ipt_filter_del_authed(&appconn->hisip);
+
+  if (dhcp_ipc_cli_fd >= 0)
+    dhcpipc_send_authstate(dhcp_ipc_cli_fd, dhcp_ipc_dhcpd_path,
+                           appconn->hismac, appconn->hisip.s_addr,
+                           new_authstate);
 
   if (!(appconn->s_params.flags & REQUIRE_UAM_AUTH)) {
     /* This is the one and only place state is switched to authenticated */
@@ -2099,21 +2032,8 @@ static int fwd_ssdp(struct in_addr *dst,
              ntohs(udph->len), bufr);
     }
 
-    /* This sends to a unicast MAC address but a multicast IP address.
-     */
-    struct dhcp_conn_t *conn = dhcp->firstusedconn;
-    while (conn) {
-      if (conn->inuse && conn->authstate == DHCP_AUTH_PASS) {
-	/*
-	if (_options.debug)
-  syslog(LOG_DEBUG, "sending to %s.", inet_ntoa(conn->hisip ));
-	*/
-	dhcp_data_req(conn, pb, ethhdr);
-      }
-      conn = conn->next;
-    }
-
-    return 1; /* match */
+    /* SSDP multicast forwarding not available: chilli_dhcp owns L2 sockets. */
+    return 1; /* match — consumed, not forwarded */
   }
 
   return 0; /* no match */
@@ -2132,7 +2052,6 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
   (void)idx;
 #endif
   struct in_addr dst;
-  struct ippoolm_t *ipm;
   struct app_conn_t *appconn = 0;
   struct pkt_udphdr_t *udph = 0;
   struct pkt_ipphdr_t *ipph;
@@ -2201,15 +2120,9 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
           /*
            *  Lookup request address, see if we control it.
            */
-          if (ippool_getip(ippool, &ipm, &reqaddr)) {
+          if (chilli_getconn(&appconn, reqaddr.s_addr, 0, 0) != 0 || !appconn) {
             if (_options.debug)
               syslog(LOG_DEBUG, "%s(%d): ARP for unknown IP %s", __FUNCTION__, __LINE__, inet_ntoa(reqaddr));
-            return 0;
-          }
-
-          if ((appconn  = (struct app_conn_t *)ipm->peer) == NULL ||
-              (appconn->dnlink) == NULL) {
-            syslog(LOG_ERR, "No peer protocol defined for ARP request");
             return 0;
           }
 
@@ -2224,8 +2137,7 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
           packet_arp->op  = htons(DHCP_ARP_REPLY);
 
           /* Source address */
-          /*memcpy(packet_arp->sha, appconn->hismac, PKT_ETH_ALEN);*/
-          memcpy(packet_arp->sha, dhcp->rawif[0].hwaddr, PKT_ETH_ALEN);
+          memcpy(packet_arp->sha, appconn->hismac, PKT_ETH_ALEN);
 
 #ifdef ENABLE_UAMANYIP
           /*
@@ -2252,8 +2164,7 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
 
           /* Ethernet header */
           memcpy(packet_ethh->dst, p_ethh->src, PKT_ETH_ALEN);
-          /*memcpy(packet_ethh->src, appconn->hismac, PKT_ETH_ALEN);*/
-          memcpy(packet_ethh->src, dhcp->rawif[0].hwaddr, PKT_ETH_ALEN);
+          memcpy(packet_ethh->src, appconn->hismac, PKT_ETH_ALEN);
 
           packet_ethh->prot = htons(PKT_ETH_PROTO_ARP);
 
@@ -2338,7 +2249,7 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
     syslog(LOG_DEBUG, "%s(%d): sending to : %s", __FUNCTION__, __LINE__, inet_ntoa(dst));
 #endif
 
-  if (ippool_getip(ippool, &ipm, &dst)) {
+  if (chilli_getconn(&appconn, dst.s_addr, 0, 0) != 0 || !appconn) {
 
     /*
      *  TODO: If within statip range, allow the packet through (?)
@@ -2354,8 +2265,6 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
     return 0;
   }
 
-  appconn = (struct app_conn_t *)ipm->peer;
-
 #ifdef ENABLE_LEAKYBUCKET
   if (_options.scalewin && appconn && appconn->s_state.bucketdownsize) {
     uint16_t win = appconn->s_state.bucketdownsize -
@@ -2365,9 +2274,8 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
   }
 #endif
 
-  if (appconn == NULL || appconn->dnlink == NULL) {
-    syslog(LOG_ERR, "No %s protocol defined for %s",
-           appconn ? "dnlink" : "peer", inet_ntoa(dst));
+  if (appconn == NULL) {
+    syslog(LOG_ERR, "No peer protocol defined for %s", inet_ntoa(dst));
     return 0;
   }
 
@@ -2419,7 +2327,8 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
 #ifdef ENABLE_EAPOL
     case DNPROT_EAPOL:
 #endif
-      dhcp_data_req((struct dhcp_conn_t *)appconn->dnlink, pb, ethhdr);
+      /* Downlink forwarding is handled by kernel nftables; no direct
+         dhcp_data_req needed from the main process. */
       break;
 
     default:
@@ -2442,9 +2351,7 @@ int cb_redir_getstate(struct redir_t *redir,
 		      struct redir_conn_t *conn) {
   (void)redir;
   struct in_addr *addr = &address->sin_addr;
-  struct ippoolm_t *ipm;
   struct app_conn_t *appconn;
-  struct dhcp_conn_t *dhcpconn;
   uint8_t flags = 0;
 
 #if defined(HAVE_NETFILTER_QUEUE) || defined(HAVE_NETFILTER_COOVA)
@@ -2454,65 +2361,26 @@ int cb_redir_getstate(struct redir_t *redir,
   }
 #endif
 
-  if (ippool_getip(ippool, &ipm, addr)) {
+  if (chilli_getconn(&appconn, addr->s_addr, 0, 0) != 0 || !appconn) {
     if (_options.debug)
       syslog(LOG_DEBUG, "%s(%d): did not find %s", __FUNCTION__, __LINE__, inet_ntoa(*addr));
     return -1;
   }
 
-  if ( (appconn  = (struct app_conn_t *)ipm->peer)        == NULL ||
-       (dhcpconn = (struct dhcp_conn_t *)appconn->dnlink) == NULL ) {
-    syslog(LOG_WARNING, "No peer protocol defined app-null=%d", appconn == 0);
-    return -1;
-  }
-
   conn->nasip = _options.radiuslisten;
   conn->nasport = appconn->unit;
-  memcpy(conn->hismac, dhcpconn->hismac, PKT_ETH_ALEN);
+  memcpy(conn->hismac, appconn->hismac, PKT_ETH_ALEN);
   conn->ourip = appconn->ourip;
   conn->hisip = appconn->hisip;
 
 #ifdef HAVE_SSL
-  /*
-   *  Determine if the connection is SSL or not.
-   */
-  {
-    int n;
-    for (n=0; n < DHCP_DNAT_MAX; n++) {
-      /*
-       *  First, search the dnat list to see if we are tracking the port.
-       */
-      /*syslog("%d(%d) == %d",ntohs(dhcpconn->dnat[n].src_port),ntohs(dhcpconn->dnat[n].dst_port),ntohs(address->sin_port));*/
-      if (dhcpconn->dnat[n].src_port == address->sin_port) {
-	if (dhcpconn->dnat[n].dst_port == htons(DHCP_HTTPS)
+  /* DNAT table lives in chilli_dhcp; SSL detection via port heuristic only */
 #ifdef ENABLE_UAMUIPORT
-	    || (_options.uamuissl && dhcpconn->dnat[n].dst_port == htons(_options.uamuiport))
-#endif
-	    ) {
-#if(_debug_)
-          if (_options.debug)
-            syslog(LOG_DEBUG, "%s(%d): redir connection is SSL", __FUNCTION__, __LINE__);
-#endif
-	  flags |= USING_SSL;
-	}
-	break;
-      }
-    }
-#ifdef ENABLE_UAMUIPORT
-    /*
-     *  If not in dnat, if uamuissl is enabled, and this is indeed that
-     *  port, then we also know it is SSL (directly to https://uamlisten:uamuiport).
-     */
-    if (n == DHCP_DNAT_MAX && _options.uamuissl &&
-	ntohs(baddress->sin_port) == _options.uamuiport) {
-#if(_debug_)
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): redir connection is SSL", __FUNCTION__, __LINE__);
-#endif
-      flags |= USING_SSL;
-    }
-#endif
+  if (_options.uamuissl &&
+      ntohs(baddress->sin_port) == _options.uamuiport) {
+    flags |= USING_SSL;
   }
+#endif
 #endif
 
   conn->flags = flags;
@@ -2615,7 +2483,8 @@ session_disconnect(struct app_conn_t *appconn,
     }
 #endif
 
-    if (member->in_use && (!dhcpconn || !dhcpconn->is_reserved)) {
+    /* IP freed by chilli_dhcp when dhcpconn is NULL (IPC path) */
+    if (dhcpconn && member->in_use && !dhcpconn->is_reserved) {
       if (ippool_freeip(ippool, member)) {
 	syslog(LOG_ERR, "ippool_freeip(%s) failed!",
                inet_ntoa(member->addr));
@@ -2675,8 +2544,6 @@ upprot_getip(struct app_conn_t *appconn,
 	     struct in_addr *hismask) {
   struct ippoolm_t *ipm = 0;
 
-  struct dhcp_conn_t *dhcpconn = (struct dhcp_conn_t *)appconn->dnlink;
-
 #if(_debug_ > 1)
   if (_options.debug)
     syslog(LOG_DEBUG, "%s(%d): UPPROT - GETIP", __FUNCTION__, __LINE__);
@@ -2689,30 +2556,38 @@ upprot_getip(struct app_conn_t *appconn,
   }
 
   if (ipm == 0) {
-    /* Allocate static or dynamic IP address */
+    if (appconn->hisip.s_addr) {
+      /* IP already assigned by chilli_dhcp via IPC — no pool allocation needed */
+      if (hismask && hismask->s_addr)
+        appconn->hismask.s_addr = hismask->s_addr;
+      else if (!appconn->hismask.s_addr)
+        appconn->hismask.s_addr = _options.mask.s_addr;
+      if (!appconn->ourip.s_addr)
+        appconn->ourip.s_addr = _options.dhcplisten.s_addr;
+    } else {
+      /* Allocate static or dynamic IP address (fallback path) */
+      if (newip(&ipm, hisip, appconn->hismac))
+        return dnprot_reject(appconn);
 
-    if (newip(&ipm, hisip, dhcpconn ? dhcpconn->hismac : 0))
-      return dnprot_reject(appconn);
+      appconn->hisip.s_addr = ipm->addr.s_addr;
 
-    appconn->hisip.s_addr = ipm->addr.s_addr;
+      if (hismask && hismask->s_addr)
+        appconn->hismask.s_addr = hismask->s_addr;
+      else
+        appconn->hismask.s_addr = _options.mask.s_addr;
 
-    if (hismask && hismask->s_addr)
-      appconn->hismask.s_addr = hismask->s_addr;
-    else
-      appconn->hismask.s_addr = _options.mask.s_addr;
+      if (!appconn->ourip.s_addr)
+        appconn->ourip.s_addr = _options.dhcplisten.s_addr;
 
-    /* TODO: Too many "listen" and "ourip" addresses! */
-    if (!appconn->ourip.s_addr)
-      appconn->ourip.s_addr = _options.dhcplisten.s_addr;
-
-    appconn->uplink = ipm;
-    ipm->peer = appconn;
+      appconn->uplink = ipm;
+      ipm->peer = appconn;
 
 #ifdef ENABLE_GARDENACCOUNTING
-    if (_options.uamgardendata) {
-      acct_req(ACCT_GARDEN, appconn, RADIUS_STATUS_TYPE_START);
-    }
+      if (_options.uamgardendata) {
+        acct_req(ACCT_GARDEN, appconn, RADIUS_STATUS_TYPE_START);
+      }
 #endif
+    }
   }
 
 #ifdef ENABLE_UAMANYIP
@@ -2910,8 +2785,12 @@ config_radius_session(struct session_params *params,
 			    RADIUS_TERMINATE_CAUSE_USER_REQUEST);
       } else if (appconn && len >= strlen(adminreset) &&
 		 !memcmp(val, adminreset, strlen(adminreset))) {
-	dhcp_release_mac(dhcp, appconn->hismac,
-			 RADIUS_TERMINATE_CAUSE_ADMIN_RESET);
+        if (dhcp)
+          dhcp_release_mac(dhcp, appconn->hismac,
+                           RADIUS_TERMINATE_CAUSE_ADMIN_RESET);
+        else if (dhcp_ipc_cli_fd >= 0)
+          dhcpipc_send_kick(dhcp_ipc_cli_fd, dhcp_ipc_dhcpd_path,
+                            appconn->hismac, appconn->hisip.s_addr);
       }
     }
   }
@@ -3105,14 +2984,10 @@ int cb_radius_auth_conf(struct radius_t *radius,
 
   struct app_conn_t *appconn = (struct app_conn_t*) cbp;
 
-  struct dhcp_conn_t *dhcpconn = NULL;
-
   if (!appconn) {
     syslog(LOG_ERR,"No peer protocol defined");
     return 0;
   }
-
-  dhcpconn = (struct dhcp_conn_t *)appconn->dnlink;
 
   /* Initialise */
   appconn->s_state.redir.statelen = 0;
@@ -3182,101 +3057,44 @@ int cb_radius_auth_conf(struct radius_t *radius,
   }
 
   if (force_ip) {
-    if (appconn->uplink) {
-      struct ippoolm_t *ipm = (struct ippoolm_t *)appconn->uplink;
-
-      if (hisip.s_addr) {
-	/*
-	 *  Force the assigment of an IP address.
-	 */
-	if (ipm->addr.s_addr != hisip.s_addr) {
-	  uint8_t hwaddr[sizeof(dhcpconn->hismac)];
-	  memcpy(hwaddr, dhcpconn->hismac, sizeof(hwaddr));
-
-          if (_options.debug) {
-            syslog(LOG_DEBUG, "%s(%d): Old ip address freed %s", __FUNCTION__, __LINE__, inet_ntoa(ipm->addr));
-            syslog(LOG_DEBUG, "%s(%d): Resetting ip address to %s", __FUNCTION__, __LINE__, inet_ntoa(hisip));
-          }
-
-	  dhcp_freeconn(dhcpconn, 0);
-	  dhcp_newconn(dhcp, &dhcpconn, hwaddr);
-
-	  appconn->dnprot = DNPROT_MAC;
-	  appconn->authtype = PAP_PASSWORD;
-	  dhcpconn->authstate = DHCP_AUTH_DNAT;
-
-	  ipm = 0;
-	}
-      }
+    if (hisip.s_addr && appconn->hisip.s_addr &&
+        appconn->hisip.s_addr != hisip.s_addr) {
+      syslog(LOG_WARNING, "%s(%d): RADIUS requested IP %s but client has %s; "
+             "IP reassignment not supported in chilli_dhcp mode",
+             __FUNCTION__, __LINE__,
+             inet_ntoa(hisip), inet_ntoa(appconn->hisip));
     }
   }
 
 #ifdef ENABLE_DHCPRADIUS
   if (_options.dhcpradius) {
     struct radius_attr_t *attr = NULL;
-    if (dhcpconn) {
-      if (!radius_getattr(pack, &attr,
-			  RADIUS_ATTR_VENDOR_SPECIFIC,
-			  RADIUS_VENDOR_COOVACHILLI,
-			  RADIUS_ATTR_COOVACHILLI_DHCP_SERVER_NAME, 0)) {
-	memcpy(dhcpconn->dhcp_opts.sname, attr->v.t, attr->l-2);
-      }
 
-      if (!radius_getattr(pack, &attr,
-			  RADIUS_ATTR_VENDOR_SPECIFIC,
-			  RADIUS_VENDOR_COOVACHILLI,
-			  RADIUS_ATTR_COOVACHILLI_DHCP_FILENAME, 0)) {
-	memcpy(dhcpconn->dhcp_opts.file, attr->v.t, attr->l-2);
-      }
-
-      if (!radius_getattr(pack, &attr,
-			  RADIUS_ATTR_VENDOR_SPECIFIC,
-			  RADIUS_VENDOR_COOVACHILLI,
-			  RADIUS_ATTR_COOVACHILLI_DHCP_OPTION, 0)) {
-	memcpy(dhcpconn->dhcp_opts.options, attr->v.t,
-	       dhcpconn->dhcp_opts.option_length = attr->l-2);
-      }
-
-      if (!radius_getattr(pack, &attr,
-			  RADIUS_ATTR_VENDOR_SPECIFIC,
-			  RADIUS_VENDOR_COOVACHILLI,
-			  RADIUS_ATTR_COOVACHILLI_DHCP_DNS1, 0)) {
-	if ((attr->l-2) == sizeof(struct in_addr)) {
-	  appconn->dns1.s_addr = attr->v.i;
-	  dhcpconn->dns1.s_addr = attr->v.i;
-	}
-      }
-
-      if (!radius_getattr(pack, &attr,
-			  RADIUS_ATTR_VENDOR_SPECIFIC,
-			  RADIUS_VENDOR_COOVACHILLI,
-			  RADIUS_ATTR_COOVACHILLI_DHCP_DNS2, 0)) {
-	if ((attr->l-2) == sizeof(struct in_addr)) {
-	  appconn->dns2.s_addr = attr->v.i;
-	  dhcpconn->dns2.s_addr = attr->v.i;
-	}
-      }
-
-      if (!radius_getattr(pack, &attr,
-			  RADIUS_ATTR_VENDOR_SPECIFIC,
-			  RADIUS_VENDOR_COOVACHILLI,
-			  RADIUS_ATTR_COOVACHILLI_DHCP_GATEWAY, 0)) {
-	if ((attr->l-2) == sizeof(struct in_addr)) {
-	  appconn->ourip.s_addr = attr->v.i;
-	  dhcpconn->ourip.s_addr = attr->v.i;
-	}
-      }
-
-      if (!radius_getattr(pack, &attr,
-			  RADIUS_ATTR_VENDOR_SPECIFIC,
-			  RADIUS_VENDOR_COOVACHILLI,
-			  RADIUS_ATTR_COOVACHILLI_DHCP_DOMAIN, 0)) {
-	if (attr->l-2 < DHCP_DOMAIN_LEN) {
-	  strncpy(dhcpconn->domain, (char *)attr->v.t, attr->l-2);
-	  dhcpconn->domain[attr->l-2]=0;
-	}
-      }
+    if (!radius_getattr(pack, &attr,
+                        RADIUS_ATTR_VENDOR_SPECIFIC,
+                        RADIUS_VENDOR_COOVACHILLI,
+                        RADIUS_ATTR_COOVACHILLI_DHCP_DNS1, 0)) {
+      if ((attr->l-2) == sizeof(struct in_addr))
+        appconn->dns1.s_addr = attr->v.i;
     }
+
+    if (!radius_getattr(pack, &attr,
+                        RADIUS_ATTR_VENDOR_SPECIFIC,
+                        RADIUS_VENDOR_COOVACHILLI,
+                        RADIUS_ATTR_COOVACHILLI_DHCP_DNS2, 0)) {
+      if ((attr->l-2) == sizeof(struct in_addr))
+        appconn->dns2.s_addr = attr->v.i;
+    }
+
+    if (!radius_getattr(pack, &attr,
+                        RADIUS_ATTR_VENDOR_SPECIFIC,
+                        RADIUS_VENDOR_COOVACHILLI,
+                        RADIUS_ATTR_COOVACHILLI_DHCP_GATEWAY, 0)) {
+      if ((attr->l-2) == sizeof(struct in_addr))
+        appconn->ourip.s_addr = attr->v.i;
+    }
+    /* sname/file/options/domain are DHCP-layer attrs; forwarding via IPC
+       is not yet implemented, chilli_dhcp uses its defaults. */
   }
 #endif
 
@@ -3809,6 +3627,95 @@ int cb_dhcp_request(struct dhcp_conn_t *conn, struct in_addr *addr,
   return 0;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Callback IPC DHCP : messages reçus de chilli_dhcp                    */
+/* ------------------------------------------------------------------ */
+
+static int dhcp_ipc_recv_cb(void *data, int idx) {
+  struct dhcpipc_msg msg;
+  struct app_conn_t *appconn = NULL;
+  struct in_addr hisip;
+  (void)data; (void)idx;
+
+  if (dhcpipc_recv(dhcp_ipc_srv_fd, &msg, NULL) != 0)
+    return -1;
+
+  switch ((dhcpipc_type_t)msg.type) {
+
+    case DHCPIPC_NEW_CLIENT:
+      hisip.s_addr = msg.ip;
+      if (chilli_new_conn(&appconn) != 0) {
+        syslog(LOG_ERR, "dhcp_ipc_recv_cb: chilli_new_conn failed for "MAC_FMT,
+               MAC_ARG(msg.mac));
+        return -1;
+      }
+      memcpy(appconn->hismac, msg.mac, PKT_ETH_ALEN);
+      appconn->hisip  = hisip;
+      appconn->dnprot = DNPROT_DHCP_NONE;
+      appconn->inuse  = 1;
+
+      /* Lier l'appconn à la liste used */
+      appconn->next = firstusedconn;
+      if (firstusedconn) firstusedconn->prev = appconn;
+      firstusedconn = appconn;
+      if (!lastusedconn) lastusedconn = appconn;
+
+      syslog(LOG_INFO, "dhcp_ipc_recv_cb: NEW_CLIENT MAC="MAC_FMT" IP=%s",
+             MAC_ARG(msg.mac), inet_ntoa(hisip));
+
+#ifdef ENABLE_MACAUTH
+      if (_options.macauth)
+        chilli_auth_radius(radius);
+#endif
+      break;
+
+    case DHCPIPC_CLIENT_GONE:
+      hisip.s_addr = msg.ip;
+      if (chilli_getconn(&appconn, msg.ip, 0, 0) == 0 && appconn) {
+        syslog(LOG_INFO, "dhcp_ipc_recv_cb: CLIENT_GONE MAC="MAC_FMT" IP=%s",
+               MAC_ARG(msg.mac), inet_ntoa(hisip));
+        ipt_filter_del_authed(&hisip);
+        session_disconnect(appconn, NULL,
+                           msg.reason == DHCPIPC_GONE_KICK
+                           ? RADIUS_TERMINATE_CAUSE_ADMIN_RESET
+                           : RADIUS_TERMINATE_CAUSE_LOST_CARRIER);
+      }
+      break;
+
+    default:
+      syslog(LOG_WARNING, "dhcp_ipc_recv_cb: unexpected type %d", msg.type);
+      break;
+  }
+
+  return 0;
+}
+
+/*
+ * Resynchronise l'état authstate de chilli_dhcp après un crash/relance.
+ * Appelé depuis _sigchld() après launch_chilli_dhcp().
+ */
+void dhcp_ipc_resync_all(void) {
+  struct app_conn_t *appconn = firstusedconn;
+  int n = 0;
+
+  if (dhcp_ipc_cli_fd < 0)
+    return;
+
+  while (appconn) {
+    if (appconn->inuse && appconn->s_state.authenticated &&
+        appconn->hisip.s_addr) {
+      dhcpipc_send_authstate(dhcp_ipc_cli_fd, dhcp_ipc_dhcpd_path,
+                             appconn->hismac, appconn->hisip.s_addr,
+                             DHCP_AUTH_PASS);
+      n++;
+    }
+    appconn = appconn->next;
+  }
+
+  if (n)
+    syslog(LOG_INFO, "dhcp_ipc_resync_all: sent %d authstate(s) to chilli_dhcp", n);
+}
 
 int chilli_connect(struct app_conn_t **appconn, struct dhcp_conn_t *conn) {
   struct app_conn_t *aconn;
@@ -4591,9 +4498,7 @@ int cb_dhcp_eap_ind(struct dhcp_conn_t *conn, uint8_t *pack, size_t len) {
 
 static int uam_msg(struct redir_msg_t *msg) {
 
-  struct ippoolm_t *ipm;
   struct app_conn_t *appconn = NULL;
-  struct dhcp_conn_t* dhcpconn;
 
 #if defined(HAVE_NETFILTER_QUEUE) || defined(HAVE_NETFILTER_COOVA)
   if (_options.uamlisten.s_addr != _options.dhcplisten.s_addr) {
@@ -4602,19 +4507,11 @@ static int uam_msg(struct redir_msg_t *msg) {
   }
 #endif
 
-  {
-    struct in_addr uam_req_ip = msg->mdata.address.sin_addr;
-
-    if (ippool_getip(ippool, &ipm, &uam_req_ip)) {
-      if (_options.debug)
-        syslog(LOG_DEBUG, "%s(%d): UAM login with unknown IP address: %s", __FUNCTION__, __LINE__, inet_ntoa(msg->mdata.address.sin_addr));
-      return 0;
-    }
-  }
-
-  if ((appconn  = (struct app_conn_t *)ipm->peer)        == NULL ||
-      (dhcpconn = (struct dhcp_conn_t *)appconn->dnlink) == NULL) {
-    syslog(LOG_ERR, "No peer protocol defined");
+  if (chilli_getconn(&appconn, msg->mdata.address.sin_addr.s_addr, 0, 0) != 0
+      || !appconn) {
+    if (_options.debug)
+      syslog(LOG_DEBUG, "%s(%d): UAM login with unknown IP address: %s",
+             __FUNCTION__, __LINE__, inet_ntoa(msg->mdata.address.sin_addr));
     return 0;
   }
 
@@ -4652,7 +4549,7 @@ static int uam_msg(struct redir_msg_t *msg) {
       appconn->recvlen  = 0;
       appconn->lmntlen  = 0;
 
-      memcpy(appconn->hismac, dhcpconn->hismac, PKT_ETH_ALEN);
+      /* hismac already set from chilli_dhcp IPC NEW_CLIENT message */
 
 #ifdef ENABLE_LEAKYBUCKET
       leaky_bucket_init(appconn);
@@ -4681,7 +4578,11 @@ static int uam_msg(struct redir_msg_t *msg) {
       appconn->uamabort = 0;
       appconn->s_state.uamtime = mainclock.tv_sec;
 
-      dhcpconn->authstate = DHCP_AUTH_DNAT;
+      ipt_filter_del_authed(&appconn->hisip);
+      if (dhcp_ipc_cli_fd >= 0)
+        dhcpipc_send_authstate(dhcp_ipc_cli_fd, dhcp_ipc_dhcpd_path,
+                               appconn->hismac, appconn->hisip.s_addr,
+                               DHCP_AUTH_DNAT);
 
       break;
 
@@ -4692,7 +4593,11 @@ static int uam_msg(struct redir_msg_t *msg) {
       appconn->uamabort = 1; /* Next login will be aborted */
       appconn->s_state.uamtime = 0;  /* Force generation of new challenge */
 
-      dhcpconn->authstate = DHCP_AUTH_DNAT;
+      ipt_filter_del_authed(&appconn->hisip);
+      if (dhcp_ipc_cli_fd >= 0)
+        dhcpipc_send_authstate(dhcp_ipc_cli_fd, dhcp_ipc_dhcpd_path,
+                               appconn->hismac, appconn->hisip.s_addr,
+                               DHCP_AUTH_DNAT);
 
       terminate_appconn(appconn, RADIUS_TERMINATE_CAUSE_USER_REQUEST);
 
@@ -4719,25 +4624,24 @@ static int uam_msg(struct redir_msg_t *msg) {
 static struct app_conn_t * find_app_conn(struct cmdsock_request *req,
                                          int *has_criteria) {
   struct app_conn_t *appconn = 0;
-  struct dhcp_conn_t *dhcpconn = 0;
 
   if (req->ip.s_addr) {
-    struct in_addr req_ip = req->ip;
-
-    appconn = dhcp_get_appconn_ip(0, &req_ip);
+    chilli_getconn(&appconn, req->ip.s_addr, 0, 0);
     if (has_criteria)
       *has_criteria = 1;
-  } else {
-    if (req->mac[0]||req->mac[1]||req->mac[2]||
-	req->mac[3]||req->mac[4]||req->mac[5]) {
-      dhcp_hashget(dhcp, &dhcpconn, req->mac);
-      if (has_criteria)
-	*has_criteria = 1;
+  } else if (req->mac[0]||req->mac[1]||req->mac[2]||
+             req->mac[3]||req->mac[4]||req->mac[5]) {
+    struct app_conn_t *aconn = firstusedconn;
+    if (has_criteria)
+      *has_criteria = 1;
+    while (aconn) {
+      if (aconn->inuse && !memcmp(aconn->hismac, req->mac, PKT_ETH_ALEN)) {
+        appconn = aconn;
+        break;
+      }
+      aconn = aconn->next;
     }
   }
-
-  if (!appconn && dhcpconn)
-    appconn = (struct app_conn_t *) dhcpconn->peer;
 
   if (!appconn && req->d.sess.sessionid[0] != 0) {
     struct app_conn_t *aconn = firstusedconn;
@@ -4773,17 +4677,8 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
 
     case CMDSOCK_ADD_GARDEN:
     case CMDSOCK_REM_GARDEN:
-      {
-        char remove = (req->type == CMDSOCK_REM_GARDEN);
-        pass_throughs_from_string(dhcp->pass_throughs,
-                                  MAX_PASS_THROUGHS,
-                                  &dhcp->num_pass_throughs,
-                                  req->d.data, 1, remove
-#ifdef HAVE_PATRICIA
-                                  , dhcp->ptree_dyn
-#endif
-                                  );
-      }
+      /* pass_throughs live in chilli_dhcp; management via IPC not yet implemented */
+      syslog(LOG_WARNING, "CMDSOCK_ADD/REM_GARDEN: not available in chilli_dhcp mode");
       break;
 
     case CMDSOCK_LOGOUT:
@@ -4822,7 +4717,6 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
             LIST_JSON_FMT : LIST_LONG_FMT;
 
         struct app_conn_t *appconn=0;
-        struct dhcp_conn_t *dhcpconn=0;
 
         int crt = 0;
 
@@ -4834,17 +4728,13 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
 
         appconn = find_app_conn(req, &crt);
         if (appconn) {
-          dhcpconn = (struct dhcp_conn_t *)appconn->dnlink;
-
-          chilli_print(s, listfmt, appconn, dhcpconn);
-
+          chilli_print(s, listfmt, appconn, NULL);
         } else if (!crt) {
-          if (dhcp) {
-            dhcpconn = dhcp->firstusedconn;
-            while (dhcpconn) {
-              chilli_print(s, listfmt, 0, dhcpconn);
-              dhcpconn = dhcpconn->next;
-            }
+          struct app_conn_t *ac = firstusedconn;
+          while (ac) {
+            if (ac->inuse)
+              chilli_print(s, listfmt, ac, NULL);
+            ac = ac->next;
           }
         }
 
@@ -4857,21 +4747,19 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
       break;
 
     case CMDSOCK_DHCP_LIST:
-      if (dhcp) {
+      {
         int listfmt = req->options & CMDSOCK_OPT_JSON ?
             LIST_JSON_FMT : LIST_SHORT_FMT;
-
-        struct dhcp_conn_t *conn;
+        struct app_conn_t *ac;
 
 #ifdef ENABLE_JSON
         if (listfmt == LIST_JSON_FMT) {
           bcatcstr(s, "{ \"sessions\":[");
         }
 #endif
-        conn = dhcp->firstusedconn;
-        while (conn) {
-          chilli_print(s, listfmt, 0, conn);
-          conn = conn->next;
+        for (ac = firstusedconn; ac; ac = ac->next) {
+          if (ac->inuse)
+            chilli_print(s, listfmt, ac, NULL);
         }
 #ifdef ENABLE_JSON
         if (listfmt == LIST_JSON_FMT) {
@@ -4901,22 +4789,19 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
             syslog(LOG_DEBUG, "%s(%d): setting route for idx %d", __FUNCTION__, __LINE__, req->d.sess.params.routeidx);
           copy_mac6(tun(tun, req->d.sess.params.routeidx).gwaddr, req->mac);
         } else {
-          struct dhcp_conn_t *conn = dhcp->firstusedconn;
+          struct app_conn_t *aconn = firstusedconn;
           if (_options.debug)
             syslog(LOG_DEBUG, "%s(%d): looking to alter session %s", __FUNCTION__, __LINE__, inet_ntoa(req->ip));
-          while (conn && conn->inuse) {
-            if (conn->peer) {
-              struct app_conn_t * appconn = (struct app_conn_t*)conn->peer;
-              if (!memcmp(appconn->hismac, req->mac, 6)) {
-                if (_options.debug)
-                  syslog(LOG_DEBUG, "%s(%d): routeidx %s %d", __FUNCTION__, __LINE__,
-                         appconn->s_state.sessionid,
-                         req->d.sess.params.routeidx);
-                appconn->s_params.routeidx = req->d.sess.params.routeidx;
-                break;
-              }
+          while (aconn) {
+            if (aconn->inuse && !memcmp(aconn->hismac, req->mac, PKT_ETH_ALEN)) {
+              if (_options.debug)
+                syslog(LOG_DEBUG, "%s(%d): routeidx %s %d", __FUNCTION__, __LINE__,
+                       aconn->s_state.sessionid,
+                       req->d.sess.params.routeidx);
+              aconn->s_params.routeidx = req->d.sess.params.routeidx;
+              break;
             }
-            conn = conn->next;
+            aconn = aconn->next;
           }
         }
       }
@@ -4946,20 +4831,18 @@ int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
           }
 
           if (!err) {
-            struct dhcp_conn_t *conn = dhcp->firstusedconn;
+            struct app_conn_t *aconn = firstusedconn;
             bassignformat(b, "subscribers:\n");
             if (safe_write(sock, b->data, b->slen) == b->slen) {
-              while (conn) {
-                struct app_conn_t *appconn = (struct app_conn_t *)conn->peer;
-
-                bassignformat(b, "mac: "MAC_FMT" -> idx: %d\n",
-                              MAC_ARG(appconn->hismac),
-                              appconn->s_params.routeidx);
-
-                if (safe_write(sock, b->data, b->slen) < 0)
-                  break;
-
-                conn = conn->next;
+              while (aconn) {
+                if (aconn->inuse) {
+                  bassignformat(b, "mac: "MAC_FMT" -> idx: %d\n",
+                                MAC_ARG(aconn->hismac),
+                                aconn->s_params.routeidx);
+                  if (safe_write(sock, b->data, b->slen) < 0)
+                    break;
+                }
+                aconn = aconn->next;
               }
             }
           }
@@ -5203,17 +5086,12 @@ static int rtmon_accept(struct rtmon_t *rtmon, int idx) {
 #endif
 
 static inline void macauth_reserved(void) {
-  struct dhcp_conn_t *conn = dhcp->firstusedconn;
-  struct app_conn_t *appconn;
+  struct app_conn_t *appconn = firstusedconn;
 
-  while (conn) {
-    if (conn->is_reserved && conn->peer) {
-      appconn = (struct app_conn_t *)conn->peer;
-      if (!appconn->s_state.authenticated) {
-	auth_radius((struct app_conn_t *)conn->peer, 0, 0, 0, 0);
-      }
-    }
-    conn = conn->next;
+  while (appconn) {
+    if (appconn->inuse && !appconn->s_state.authenticated)
+      auth_radius(appconn, 0, 0, 0, 0);
+    appconn = appconn->next;
   }
 }
 
@@ -5444,45 +5322,21 @@ int chilli_main(int argc, char **argv) {
     if (_options.ipup)
       tun_runscript(tun, _options.ipup, 0);
 
-    /* Allocate ippool for dynamic IP address allocation */
-    if (ippool_new(&ippool,
-                   _options.dynip,
-                   _options.dhcpstart,
-                   _options.dhcpend,
-                   _options.statip,
-                   _options.allowdyn,
-                   _options.allowstat)) {
-      syslog(LOG_ERR, "Failed to allocate IP pool!");
-      exit(1);
-    }
+    /* Initialiser le filtrage nftables */
+    if (ipt_filter_init(_options.dhcpif) != 0)
+      syslog(LOG_WARNING, "ipt_filter_init failed; packet filtering may not work");
 
-    /* Create an instance of dhcp */
-    if (dhcp_new(&dhcp,
-                 _options.max_clients,
-                 _options.dhcphashsize,
-                 _options.dhcpif,
-                 _options.dhcpusemac,
-                 _options.dhcpmac, 1,
-                 &_options.dhcplisten, _options.lease, 1,
-                 &_options.uamlisten, _options.uamport,
-                 _options.noc2c)) {
-      syslog(LOG_ERR, "Failed to create dhcp listener on %s", _options.dhcpif);
-      exit(1);
-    }
-
-    dhcp_set_cb_request(dhcp, cb_dhcp_request);
-    dhcp_set_cb_connect(dhcp, cb_dhcp_connect);
-    dhcp_set_cb_disconnect(dhcp, cb_dhcp_disconnect);
-    dhcp_set_cb_data_ind(dhcp, cb_dhcp_data_ind);
-#ifdef ENABLE_EAPOL
-    dhcp_set_cb_eap_ind(dhcp, cb_dhcp_eap_ind);
-#endif
-
-    if (dhcp_set(dhcp,
-                 _options.ethers,
-                 (_options.debug & DEBUG_DHCP))) {
-      syslog(LOG_ERR, "Failed to set DHCP parameters");
-      exit(1);
+    /* Ouvrir la socket IPC côté main (serveur pour NEW_CLIENT/GONE) */
+    {
+      const char *base = (_options.dhcpsocket && *_options.dhcpsocket)
+                         ? _options.dhcpsocket : DHCPIPC_DEFAULT_SOCK;
+      snprintf(dhcp_ipc_dhcpd_path, sizeof(dhcp_ipc_dhcpd_path), "%s.d", base);
+      dhcp_ipc_srv_fd = dhcpipc_open_server(base);
+      if (dhcp_ipc_srv_fd < 0)
+        syslog(LOG_ERR, "Failed to open DHCP IPC server socket %s", base);
+      dhcp_ipc_cli_fd = dhcpipc_open_client(dhcp_ipc_dhcpd_path);
+      if (dhcp_ipc_cli_fd < 0)
+        syslog(LOG_ERR, "Failed to open DHCP IPC client socket");
     }
 
     /* Create an instance of radius */
@@ -5495,8 +5349,7 @@ int chilli_main(int argc, char **argv) {
       return -1;
     }
 
-    radius_set(radius, dhcp ? dhcp->rawif[0].hwaddr : 0,
-               (_options.debug & DEBUG_RADIUS));
+    radius_set(radius, NULL, (_options.debug & DEBUG_RADIUS));
 
     radius_set_cb_auth_conf(radius, cb_radius_auth_conf);
 #ifdef ENABLE_COA
@@ -5531,7 +5384,7 @@ int chilli_main(int argc, char **argv) {
       return -1;
     }
 
-    redir_set(redir, dhcp->rawif[0].hwaddr, (_options.debug));
+    redir_set(redir, NULL, (_options.debug));
 
     /* not really needed for chilliredir */
     redir_set_cb_getstate(redir, cb_redir_getstate);
@@ -5562,13 +5415,11 @@ int chilli_main(int argc, char **argv) {
     }
 
     if (_options.redir) {
-#ifdef ENABLE_CHILLIREDIR
       launch_chilliredir();
-#else
-      syslog(LOG_ERR, "Feature is not supported; use --enable-chilliredir");
-      _options.redir = 0;
-#endif
     }
+
+    /* Lancer chilli_dhcp (toujours, pas d'option de compilation) */
+    launch_chilli_dhcp();
 
 #if(_debug_)
     if (_options.debug)
@@ -5648,33 +5499,10 @@ int chilli_main(int argc, char **argv) {
     net_select_reg(&sctx, radius->fd, SELECT_READ,
                    (select_callback)radius_decaps, radius, 0);
 
-#if defined(__linux__)
-    net_select_reg(&sctx, dhcp->relayfd, SELECT_READ,
-                   (select_callback)dhcp_relay_decaps, dhcp, 0);
-
-    for (i=0; i < MAX_RAWIF && dhcp->rawif[i].fd > 0; i++) {
-      net_select_reg(&sctx, dhcp->rawif[i].fd, SELECT_READ,
-                     (select_callback)dhcp_decaps, dhcp, i);
-
-      dhcp->rawif[i].sctx = &sctx;
-    }
-
-#ifdef HAVE_NETFILTER_QUEUE
-    if (dhcp->qif_in.fd && dhcp->qif_out.fd) {
-      net_select_reg(&sctx, dhcp->qif_in.fd, SELECT_READ,
-                     (select_callback)dhcp_decaps, dhcp, 1);
-
-      net_select_reg(&sctx, dhcp->qif_out.fd, SELECT_READ,
-                     (select_callback)dhcp_decaps, dhcp, 2);
-    }
-#endif
-
-#elif defined (__FreeBSD__)  || defined (__APPLE__) || defined (__OpenBSD__) || defined (__NetBSD__)
-    for (i=0; i < MAX_RAWIF && dhcp->rawif[i].fd > 0; i++) {
-      net_select_reg(&sctx, dhcp->rawif[i].fd, SELECT_READ,
-                     (select_callback)dhcp_receive, dhcp, i);
-    }
-#endif
+    /* IPC avec chilli_dhcp */
+    if (dhcp_ipc_srv_fd >= 0)
+      net_select_reg(&sctx, dhcp_ipc_srv_fd, SELECT_READ,
+                     (select_callback)dhcp_ipc_recv_cb, NULL, 0);
 
 #ifdef USING_IPC_UNIX
     net_select_reg(&sctx, redir->msgfd, SELECT_READ,
@@ -5709,19 +5537,11 @@ int chilli_main(int argc, char **argv) {
 
         reload_config = 0;
 
-        /* Reinit DHCP parameters */
-        if (dhcp) {
-          dhcp_set(dhcp,
-                   _options.ethers,
-                   (_options.debug & DEBUG_DHCP));
-        }
-
         /* Reinit RADIUS parameters */
-        radius_set(radius, dhcp->rawif[0].hwaddr,
-                   (_options.debug & DEBUG_RADIUS));
+        radius_set(radius, NULL, (_options.debug & DEBUG_RADIUS));
 
         /* Reinit Redir parameters */
-        redir_set(redir, dhcp->rawif[0].hwaddr, _options.debug);
+        redir_set(redir, NULL, _options.debug);
 
 #ifdef HAVE_PATRICIA
         garden_patricia_reload();
@@ -5742,9 +5562,6 @@ int chilli_main(int argc, char **argv) {
          *  Every second, more or less
          */
         radius_timeout(radius);
-
-        if (dhcp)
-          dhcp_timeout(dhcp);
 
         checkconn();
         lastSecond = mainclock.tv_sec;
@@ -5775,8 +5592,6 @@ int chilli_main(int argc, char **argv) {
       }
 
 #ifdef USING_MMAP
-
-      net_run(&dhcp->rawif[0]);
 
 #ifdef ENABLE_MULTIROUTE
       if (tun) {
@@ -5835,11 +5650,9 @@ int chilli_main(int argc, char **argv) {
     cmdsock_shutdown(cmdsock);
 #endif
 
-#ifdef ENABLE_CHILLIREDIR
     if (redir_pid > 0) {
       kill(redir_pid, SIGTERM);
     }
-#endif
 #ifdef ENABLE_CHILLIRADSEC
     if (radsec_pid > 0) {
       kill(radsec_pid, SIGTERM);

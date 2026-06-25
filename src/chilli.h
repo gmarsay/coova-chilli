@@ -241,10 +241,14 @@ pid_t chilli_fork(uint8_t type, char *name);
 
 void child_killall(int sig);
 
+extern pid_t dhcp_pid;
+void launch_chilli_dhcp(void);
+
 #define CHILLI_PROC        0
 #define CHILLI_PROC_DAEMON 1
 #define CHILLI_PROC_REDIR  2
 #define CHILLI_PROC_SCRIPT 3
+#define CHILLI_PROC_DHCP   4
 
 #ifdef ENABLE_PROXYVSA
 int radius_addvsa(struct radius_packet_t *pack, struct redir_state *state);

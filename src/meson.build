@@ -261,6 +261,8 @@ lib_sources = files(
   'safe.c',
   'sfhash.c',
   'cmdsock.c',
+  'dhcpipc.c',
+  'ipt_filter.c',
 )
 
 if openssl_opt
@@ -309,6 +311,17 @@ foreach e : [
     install_dir: get_option('sbindir'),
   )
 endforeach
+
+# chilli_dhcp — processus dédié DHCP/ippool
+executable(
+  'chilli_dhcp',
+  files('main-dhcp.c'),
+  include_directories: inc,
+  link_with: libchilli,
+  dependencies: exe_deps,
+  install: true,
+  install_dir: get_option('sbindir'),
+)
 
 # cmdline.c / cmdline.h attendent PACKAGE et VERSION (config.h) avant inclusion.
 executable(

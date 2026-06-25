@@ -38,7 +38,6 @@ typedef struct pass_through_t {
     (a)->proto       == (b)->proto       &&     \
     (a)->port        == (b)->port)
 
-#ifdef ENABLE_CHILLIREDIR
 typedef struct regex_pass_through_t {
   char regex_host[512];
   char regex_path[512];
@@ -56,7 +55,6 @@ typedef struct regex_pass_through_t {
 int regex_pass_throughs_from_string(regex_pass_through *ptlist,
 				    uint32_t ptlen, uint32_t *ptcnt,
 				    char *s, char is_dyn);
-#endif
 
 int pass_through_add(pass_through *ptlist,
 		     uint32_t ptlen, uint32_t *ptcnt,
