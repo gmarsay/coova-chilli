@@ -3672,10 +3672,13 @@ static int dhcp_ipc_recv_cb(void *data, int idx) {
           return -1;
         }
         memcpy(appconn->hismac, msg.mac, PKT_ETH_ALEN);
-        appconn->dnprot = DNPROT_DHCP_NONE;
       }
 
-      appconn->hisip = hisip;
+      appconn->hisip   = hisip;
+      appconn->hismask = _options.mask;
+      appconn->ourip   = _options.dhcplisten;
+      /* IP assigned → client is in UAM (captive portal) state */
+      appconn->dnprot  = DNPROT_UAM;
 
       syslog(LOG_INFO, "dhcp_ipc_recv_cb: NEW_CLIENT MAC="MAC_FMT" IP=%s",
              MAC_ARG(msg.mac), inet_ntoa(hisip));
