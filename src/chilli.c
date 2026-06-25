@@ -3645,15 +3645,30 @@ static int dhcp_ipc_recv_cb(void *data, int idx) {
 
     case DHCPIPC_NEW_CLIENT:
       hisip.s_addr = msg.ip;
-      if (chilli_new_conn(&appconn) != 0) {
-        syslog(LOG_ERR, "dhcp_ipc_recv_cb: chilli_new_conn failed for "MAC_FMT,
-               MAC_ARG(msg.mac));
-        return -1;
+
+      /* Deduplicate by MAC: reuse existing app_conn_t if same client reconnects */
+      {
+        struct app_conn_t *a = firstusedconn;
+        while (a) {
+          if (a->inuse && !memcmp(a->hismac, msg.mac, PKT_ETH_ALEN)) {
+            appconn = a;
+            break;
+          }
+          a = a->next;
+        }
       }
-      memcpy(appconn->hismac, msg.mac, PKT_ETH_ALEN);
-      appconn->hisip  = hisip;
-      appconn->dnprot = DNPROT_DHCP_NONE;
-      /* inuse=1 and firstusedconn insertion already done by chilli_new_conn */
+
+      if (!appconn) {
+        if (chilli_new_conn(&appconn) != 0) {
+          syslog(LOG_ERR, "dhcp_ipc_recv_cb: chilli_new_conn failed for "MAC_FMT,
+                 MAC_ARG(msg.mac));
+          return -1;
+        }
+        memcpy(appconn->hismac, msg.mac, PKT_ETH_ALEN);
+        appconn->dnprot = DNPROT_DHCP_NONE;
+      }
+
+      appconn->hisip = hisip;
 
       syslog(LOG_INFO, "dhcp_ipc_recv_cb: NEW_CLIENT MAC="MAC_FMT" IP=%s",
              MAC_ARG(msg.mac), inet_ntoa(hisip));
