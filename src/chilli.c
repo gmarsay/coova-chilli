@@ -5366,10 +5366,6 @@ int chilli_main(int argc, char **argv) {
       return -1;
     }
 
-    if (!_options.redir && redir_listen(redir)) {
-      syslog(LOG_ERR, "Failed to create redir listen");
-      return -1;
-    }
 
     if (redir_ipc(redir)) {
       syslog(LOG_ERR, "Failed to create redir IPC");
@@ -5406,9 +5402,7 @@ int chilli_main(int argc, char **argv) {
       _options.uamaaaurl = NULL;
     }
 
-    if (_options.redir) {
-      launch_chilliredir();
-    }
+    launch_chilliredir();
 
     /* Lancer chilli_dhcp (toujours, pas d'option de compilation) */
     launch_chilli_dhcp();
@@ -5501,12 +5495,6 @@ int chilli_main(int argc, char **argv) {
                    redir_msg_select_cb, redir, 0);
 #endif
 
-    if (!_options.redir) {
-      net_select_reg(&sctx, redir->fd[0], SELECT_READ,
-                     (select_callback)redir_accept, redir, 0);
-      net_select_reg(&sctx, redir->fd[1], SELECT_READ,
-                     (select_callback)redir_accept, redir, 1);
-    }
 
 #ifdef ENABLE_MULTIROUTE
     if (!rtmon_init(&_rtmon, rtmon_proc_route)) {
