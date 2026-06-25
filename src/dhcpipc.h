@@ -20,7 +20,18 @@ typedef enum {
   DHCPIPC_CLIENT_GONE   = 2,  /* chilli_dhcp → main : client parti         */
   DHCPIPC_SET_AUTHSTATE = 3,  /* main → chilli_dhcp : mise à jour authstate */
   DHCPIPC_KICK_CLIENT   = 4,  /* main → chilli_dhcp : forcer déconnexion   */
+  DHCPIPC_SEND_DOWN     = 5,  /* main → chilli_dhcp : paquet IP descendant  */
 } dhcpipc_type_t;
+
+/* Socket séparé pour les paquets descendants (plus grand que dhcpipc_msg) */
+#define DHCPIPC_DOWN_SUFFIX    ".d.pkt"
+#define DHCPIPC_DOWN_MAX_PKT   1600
+
+struct dhcpipc_down_msg {
+  uint8_t  mac[PKT_ETH_ALEN]; /* MAC destination (client) */
+  uint16_t len;                /* longueur du paquet IP    */
+  uint8_t  data[DHCPIPC_DOWN_MAX_PKT];
+} __attribute__((packed));
 
 typedef enum {
   DHCPIPC_GONE_RELEASE  = 1,
@@ -53,5 +64,11 @@ int dhcpipc_send_authstate(int fd, const char *dest_path,
                            uint8_t authstate);
 int dhcpipc_send_kick(int fd, const char *dest_path,
                       const uint8_t *mac, uint32_t ip);
+
+/* Downlink: envoie un paquet IP brut vers chilli_dhcp pour injection L2 */
+int dhcpipc_send_down(int fd, const char *dest_path,
+                      const uint8_t *mac,
+                      const uint8_t *pkt, uint16_t pktlen);
+int dhcpipc_recv_down(int fd, struct dhcpipc_down_msg *msg);
 
 #endif /* _DHCPIPC_H */

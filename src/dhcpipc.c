@@ -4,6 +4,7 @@
  */
 
 #include <errno.h>
+#include <stddef.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -146,4 +147,45 @@ int dhcpipc_send_kick(int fd, const char *dest_path,
   memcpy(msg.mac, mac, PKT_ETH_ALEN);
   msg.ip   = ip;
   return _send_to_path(fd, dest_path, &msg);
+}
+
+int dhcpipc_send_down(int fd, const char *dest_path,
+                      const uint8_t *mac,
+                      const uint8_t *pkt, uint16_t pktlen) {
+  struct dhcpipc_down_msg msg;
+  struct sockaddr_un dest;
+  ssize_t n;
+  size_t  msglen;
+
+  if (pktlen > DHCPIPC_DOWN_MAX_PKT) {
+    syslog(LOG_WARNING, "dhcpipc_send_down: packet too large (%d)", pktlen);
+    return -1;
+  }
+
+  memcpy(msg.mac, mac, PKT_ETH_ALEN);
+  msg.len = pktlen;
+  memcpy(msg.data, pkt, pktlen);
+
+  msglen = offsetof(struct dhcpipc_down_msg, data) + pktlen;
+
+  memset(&dest, 0, sizeof(dest));
+  dest.sun_family = AF_UNIX;
+  strncpy(dest.sun_path, dest_path, sizeof(dest.sun_path) - 1);
+
+  n = sendto(fd, &msg, msglen, 0, (struct sockaddr *)&dest, sizeof(dest));
+  if (n < 0) {
+    syslog(LOG_ERR, "dhcpipc_send_down: sendto() failed: %s", strerror(errno));
+    return -1;
+  }
+  return 0;
+}
+
+int dhcpipc_recv_down(int fd, struct dhcpipc_down_msg *msg) {
+  ssize_t n = recv(fd, msg, sizeof(*msg), 0);
+  if (n < (ssize_t)offsetof(struct dhcpipc_down_msg, data)) {
+    if (errno != EAGAIN && errno != EWOULDBLOCK)
+      syslog(LOG_ERR, "dhcpipc_recv_down: recv() failed or too short: %s", strerror(errno));
+    return -1;
+  }
+  return 0;
 }

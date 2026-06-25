@@ -28,9 +28,11 @@ struct radius_t *radius;          /* Radius client instance */
 struct dhcp_t *dhcp = NULL;       /* DHCP instance */
 struct redir_t *redir = NULL;     /* Redir instance */
 
-static int dhcp_ipc_srv_fd = -1;  /* reçoit NEW_CLIENT/GONE de chilli_dhcp */
-static int dhcp_ipc_cli_fd = -1;  /* envoie SET_AUTHSTATE/KICK vers chilli_dhcp */
-static char dhcp_ipc_dhcpd_path[108]; /* chemin du socket de chilli_dhcp */
+static int dhcp_ipc_srv_fd  = -1;  /* reçoit NEW_CLIENT/GONE de chilli_dhcp   */
+static int dhcp_ipc_cli_fd  = -1;  /* envoie SET_AUTHSTATE/KICK vers chilli_dhcp */
+static int dhcp_ipc_down_fd = -1;  /* envoie paquets IP descendants vers chilli_dhcp */
+static char dhcp_ipc_dhcpd_path[108];      /* chemin du socket ctrl de chilli_dhcp */
+static char dhcp_ipc_down_path[108];       /* chemin du socket downlink de chilli_dhcp */
 
 #ifdef ENABLE_MULTIROUTE
 #include "rtmon.h"
@@ -2330,8 +2332,10 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
 #ifdef ENABLE_EAPOL
     case DNPROT_EAPOL:
 #endif
-      /* Downlink forwarding is handled by kernel nftables; no direct
-         dhcp_data_req needed from the main process. */
+      /* Forward the IP packet to chilli_dhcp which owns the raw L2 socket */
+      if (dhcp_ipc_down_fd >= 0 && len <= DHCPIPC_DOWN_MAX_PKT)
+        dhcpipc_send_down(dhcp_ipc_down_fd, dhcp_ipc_down_path,
+                          appconn->hismac, pack, (uint16_t)len);
       break;
 
     default:
@@ -5343,12 +5347,16 @@ int chilli_main(int argc, char **argv) {
       const char *base = (_options.dhcpsocket && *_options.dhcpsocket)
                          ? _options.dhcpsocket : DHCPIPC_DEFAULT_SOCK;
       snprintf(dhcp_ipc_dhcpd_path, sizeof(dhcp_ipc_dhcpd_path), "%s.d", base);
+      snprintf(dhcp_ipc_down_path,  sizeof(dhcp_ipc_down_path),  "%s.d.pkt", base);
       dhcp_ipc_srv_fd = dhcpipc_open_server(base);
       if (dhcp_ipc_srv_fd < 0)
         syslog(LOG_ERR, "Failed to open DHCP IPC server socket %s", base);
       dhcp_ipc_cli_fd = dhcpipc_open_client(dhcp_ipc_dhcpd_path);
       if (dhcp_ipc_cli_fd < 0)
         syslog(LOG_ERR, "Failed to open DHCP IPC client socket");
+      dhcp_ipc_down_fd = dhcpipc_open_client(dhcp_ipc_down_path);
+      if (dhcp_ipc_down_fd < 0)
+        syslog(LOG_ERR, "Failed to open DHCP IPC downlink socket");
     }
 
     /* Create an instance of radius */

@@ -83,10 +83,12 @@ static void local_client_free(const uint8_t *mac) {
 static struct dhcp_t   *dhcp_g    = NULL;
 static struct ippool_t *ippool_g  = NULL;
 
-static int  ipc_srv_fd  = -1;   /* serveur : reçoit SET_AUTHSTATE / KICK */
-static int  ipc_cli_fd  = -1;   /* client  : envoie NEW_CLIENT / GONE     */
-static char ipc_main_path[108];  /* chemin du socket côté main             */
-static char ipc_srv_path[108];   /* chemin du socket de ce processus       */
+static int  ipc_srv_fd   = -1;   /* serveur : reçoit SET_AUTHSTATE / KICK     */
+static int  ipc_cli_fd   = -1;   /* client  : envoie NEW_CLIENT / GONE        */
+static int  ipc_down_fd  = -1;   /* serveur : reçoit paquets IP descendants   */
+static char ipc_main_path[108];  /* chemin du socket côté main                */
+static char ipc_srv_path[108];   /* chemin du socket ctrl de ce processus     */
+static char ipc_down_path[108];  /* chemin du socket downlink de ce processus */
 
 static volatile int keep_going    = 1;
 static volatile int reload_config = 0;
@@ -240,6 +242,36 @@ static int ipc_select_cb(void *data, int idx) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Callback downlink : paquet IP reçu du main, à injecter en L2        */
+/* ------------------------------------------------------------------ */
+
+static int ipc_down_cb(void *data, int idx) {
+  struct dhcpipc_down_msg msg;
+  struct dhcp_conn_t *conn = NULL;
+  uint8_t buf[PKT_ETH_HLEN + DHCPIPC_DOWN_MAX_PKT];
+  struct pkt_buffer pb;
+  (void)data; (void)idx;
+
+  if (dhcpipc_recv_down(ipc_down_fd, &msg) != 0)
+    return -1;
+
+  if (!dhcp_g || msg.len == 0 || msg.len > DHCPIPC_DOWN_MAX_PKT)
+    return 0;
+
+  if (dhcp_hashget(dhcp_g, &conn, msg.mac) != 0 || !conn) {
+    syslog(LOG_DEBUG, "chilli_dhcp: down_pkt: unknown MAC "MAC_FMT, MAC_ARG(msg.mac));
+    return 0;
+  }
+
+  /* Copier le paquet IP avec headroom pour l'en-tête Ethernet */
+  memcpy(buf + PKT_ETH_HLEN, msg.data, msg.len);
+  pkt_buffer_init2(&pb, buf, sizeof(buf), PKT_ETH_HLEN, msg.len);
+
+  dhcp_data_req(conn, &pb, 0);
+  return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Gestion signaux                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -322,13 +354,21 @@ int main(int argc, char **argv) {
               : DHCPIPC_DEFAULT_SOCK;
 
   /* Chemin du socket côté main (on envoie là-dedans) */
-  snprintf(ipc_main_path, sizeof(ipc_main_path), "%s", base_path);
-  /* Chemin du socket propre à chilli_dhcp */
-  snprintf(ipc_srv_path,  sizeof(ipc_srv_path),  "%s.d", base_path);
+  snprintf(ipc_main_path, sizeof(ipc_main_path), "%s",       base_path);
+  /* Chemin du socket ctrl propre à chilli_dhcp */
+  snprintf(ipc_srv_path,  sizeof(ipc_srv_path),  "%s.d",     base_path);
+  /* Chemin du socket downlink propre à chilli_dhcp */
+  snprintf(ipc_down_path, sizeof(ipc_down_path), "%s.d.pkt", base_path);
 
   ipc_srv_fd = dhcpipc_open_server(ipc_srv_path);
   if (ipc_srv_fd < 0) {
     syslog(LOG_ERR, "chilli_dhcp: cannot open IPC server %s", ipc_srv_path);
+    return 1;
+  }
+
+  ipc_down_fd = dhcpipc_open_server(ipc_down_path);
+  if (ipc_down_fd < 0) {
+    syslog(LOG_ERR, "chilli_dhcp: cannot open downlink socket %s", ipc_down_path);
     return 1;
   }
 
@@ -373,9 +413,11 @@ int main(int argc, char **argv) {
   }
 #endif
 
-  /* Fd IPC avec son callback */
-  net_select_reg(&sctx, ipc_srv_fd, SELECT_READ,
+  /* Fd IPC ctrl et downlink avec leurs callbacks */
+  net_select_reg(&sctx, ipc_srv_fd,  SELECT_READ,
                  (select_callback)ipc_select_cb, NULL, 0);
+  net_select_reg(&sctx, ipc_down_fd, SELECT_READ,
+                 (select_callback)ipc_down_cb,   NULL, 0);
 
   mainclock_tick();
 
@@ -409,8 +451,10 @@ int main(int argc, char **argv) {
   syslog(LOG_INFO, "chilli_dhcp: shutting down");
 
   unlink(ipc_srv_path);
-  if (ipc_srv_fd >= 0) close(ipc_srv_fd);
-  if (ipc_cli_fd >= 0) close(ipc_cli_fd);
+  unlink(ipc_down_path);
+  if (ipc_srv_fd  >= 0) close(ipc_srv_fd);
+  if (ipc_down_fd >= 0) close(ipc_down_fd);
+  if (ipc_cli_fd  >= 0) close(ipc_cli_fd);
 
   return 0;
 }
