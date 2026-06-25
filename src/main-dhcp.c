@@ -14,6 +14,9 @@
 #include "chilli.h"
 #include "dhcpipc.h"
 #include <syslog.h>
+
+/* dhcp.c and statusfile.c access these globals directly via extern */
+extern struct ippool_t *ippool;
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -266,6 +269,7 @@ int main(int argc, char **argv) {
     syslog(LOG_ERR, "chilli_dhcp: ippool_new failed");
     return 1;
   }
+  ippool = ippool_g;  /* dhcp.c references this global directly */
 
   /* 4 — Instance DHCP */
   if (dhcp_new(&dhcp_g,
@@ -280,6 +284,7 @@ int main(int argc, char **argv) {
     syslog(LOG_ERR, "chilli_dhcp: dhcp_new failed on %s", _options.dhcpif);
     return 1;
   }
+  dhcp = dhcp_g;  /* dhcp_newconn() uses global dhcp, not its 'this' parameter */
 
   dhcp_set_cb_connect(dhcp_g,    cb_local_dhcp_connect);
   dhcp_set_cb_disconnect(dhcp_g, cb_local_dhcp_disconnect);
