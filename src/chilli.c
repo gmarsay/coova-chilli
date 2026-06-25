@@ -2059,10 +2059,10 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
   uint8_t *pack = pkt_buffer_head(pb);
   size_t len = pkt_buffer_length(pb);
 
-  int ethhdr = (tun(tun, idx).flags & NET_ETHHDR) != 0;
   size_t ip_len = len;
 
 #ifdef ENABLE_TAP
+  int ethhdr = (tun(tun, idx).flags & NET_ETHHDR) != 0;
   if (idx) ethhdr = 0;
 
   if (ethhdr) {
@@ -3653,13 +3653,7 @@ static int dhcp_ipc_recv_cb(void *data, int idx) {
       memcpy(appconn->hismac, msg.mac, PKT_ETH_ALEN);
       appconn->hisip  = hisip;
       appconn->dnprot = DNPROT_DHCP_NONE;
-      appconn->inuse  = 1;
-
-      /* Lier l'appconn à la liste used */
-      appconn->next = firstusedconn;
-      if (firstusedconn) firstusedconn->prev = appconn;
-      firstusedconn = appconn;
-      if (!lastusedconn) lastusedconn = appconn;
+      /* inuse=1 and firstusedconn insertion already done by chilli_new_conn */
 
       syslog(LOG_INFO, "dhcp_ipc_recv_cb: NEW_CLIENT MAC="MAC_FMT" IP=%s",
              MAC_ARG(msg.mac), inet_ntoa(hisip));
@@ -5123,8 +5117,6 @@ int chilli_main(int argc, char **argv) {
   int pkt_io_to_main[2];
 #endif
 
-  int i;
-
   int keep_going = 1;
   int reload_config = 0;
 
@@ -5238,7 +5230,7 @@ int chilli_main(int argc, char **argv) {
 
     closelog();
 
-    if (_options.debug)
+    if (_options.debug || _options.foreground)
       syslog_options |= syslog_debug_options;
     openlog(syslog_ident, syslog_options, (_options.logfacility<<3));
     if (!_options.debug)

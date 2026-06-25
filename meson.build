@@ -15,7 +15,6 @@ cc = meson.get_compiler('c')
 
 add_project_arguments('-D_GNU_SOURCE', language: 'c')
 add_project_arguments(
-  '-Wall',
   '-fno-builtin',
   '-fno-strict-aliasing',
   '-fomit-frame-pointer',

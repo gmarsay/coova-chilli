@@ -564,6 +564,8 @@ int pass_throughs_from_string(pass_through *ptlist, uint32_t ptlen,
 int regex_pass_throughs_from_string(regex_pass_through *ptlist, uint32_t ptlen,
 				    uint32_t *ptcnt, char *s,
 				    char is_dyn) {
+  (void)ptlen;
+  (void)is_dyn;
   uint32_t cnt = *ptcnt;
   regex_pass_through pt;
   char *p, *st;

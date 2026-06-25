@@ -236,7 +236,11 @@ int main(int argc, char **argv) {
   select_ctx sctx;
   const char *base_path;
 
+#ifdef LOG_PERROR
+  openlog("chilli_dhcp", LOG_PID | LOG_PERROR, LOG_DAEMON);
+#else
   openlog("chilli_dhcp", LOG_PID, LOG_DAEMON);
+#endif
 
   /* 1 — Charger la configuration via -b <binconfig> */
   if (!process_options(argc, argv, 0)) {
