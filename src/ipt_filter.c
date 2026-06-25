@@ -18,9 +18,11 @@
 #define IPSET_NAME "chilli_authed"
 #define IPTABLES   "iptables-legacy"
 
-/* Interface DHCP et uamport mémorisés à l'init pour le cleanup */
+/* Interface DHCP, uamlisten, uamport et uamuiport mémorisés pour le cleanup */
 static char     _iface[64];
+static char     _uamlisten[INET_ADDRSTRLEN];
 static uint16_t _uamport;
+static uint16_t _uamuiport;
 
 /* ------------------------------------------------------------------ */
 /* Helper : exécute une commande, retourne 0 si succès                  */
@@ -42,12 +44,18 @@ static int run_cmd(const char *cmd) {
 /* API publique                                                          */
 /* ------------------------------------------------------------------ */
 
-int ipt_filter_init(const char *iface, uint16_t uamport) {
+int ipt_filter_init(const char *iface, struct in_addr uamlisten,
+                    uint16_t uamport, uint16_t uamuiport) {
   char cmd[512];
 
   strncpy(_iface, iface ? iface : "", sizeof(_iface) - 1);
   _iface[sizeof(_iface) - 1] = '\0';
-  _uamport = uamport;
+  if (!inet_ntop(AF_INET, &uamlisten, _uamlisten, sizeof(_uamlisten))) {
+    syslog(LOG_ERR, "ipt_filter_init: inet_ntop(uamlisten) failed");
+    return -1;
+  }
+  _uamport   = uamport;
+  _uamuiport = uamuiport;
 
   /* Nettoyage d'une configuration précédente (ignore les erreurs) */
   snprintf(cmd, sizeof(cmd),
@@ -62,8 +70,10 @@ int ipt_filter_init(const char *iface, uint16_t uamport) {
            _iface);
   run_cmd(cmd);
 
-  /* Nettoyage REDIRECT NAT précédent */
+  /* Nettoyage DNAT/REDIRECT NAT précédents (tolérant aux deux formes) */
   if (uamport) {
+    int https_port_cleanup = (uamuiport > 0) ? uamuiport : uamport;
+    /* Anciennes règles REDIRECT (rétrocompatibilité) */
     snprintf(cmd, sizeof(cmd),
              IPTABLES " -t nat -D PREROUTING -i %s"
              " -m set ! --match-set " IPSET_NAME " src"
@@ -74,7 +84,20 @@ int ipt_filter_init(const char *iface, uint16_t uamport) {
              IPTABLES " -t nat -D PREROUTING -i %s"
              " -m set ! --match-set " IPSET_NAME " src"
              " -p tcp --dport 443 -j REDIRECT --to-port %d 2>/dev/null",
-             _iface, uamport);
+             _iface, https_port_cleanup);
+    run_cmd(cmd);
+    /* Règles DNAT actuelles */
+    snprintf(cmd, sizeof(cmd),
+             IPTABLES " -t nat -D PREROUTING -i %s"
+             " -m set ! --match-set " IPSET_NAME " src"
+             " -p tcp --dport 80 -j DNAT --to-destination %s:%d 2>/dev/null",
+             _iface, _uamlisten, uamport);
+    run_cmd(cmd);
+    snprintf(cmd, sizeof(cmd),
+             IPTABLES " -t nat -D PREROUTING -i %s"
+             " -m set ! --match-set " IPSET_NAME " src"
+             " -p tcp --dport 443 -j DNAT --to-destination %s:%d 2>/dev/null",
+             _iface, _uamlisten, https_port_cleanup);
     run_cmd(cmd);
   }
 
@@ -130,29 +153,33 @@ int ipt_filter_init(const char *iface, uint16_t uamport) {
            IPTABLES " -A FORWARD -o %s -j DROP", _iface);
   run_cmd(cmd);
 
-  /* REDIRECT : HTTP/HTTPS des non-authentifiés vers uamport */
+  /* DNAT : HTTP → uamlisten:uamport, HTTPS → uamlisten:uamuiport (ou uamport) */
   if (uamport) {
-    snprintf(cmd, sizeof(cmd),
-             IPTABLES " -t nat -I PREROUTING 1 -i %s"
-             " -m set ! --match-set " IPSET_NAME " src"
-             " -p tcp --dport 80 -j REDIRECT --to-port %d",
-             _iface, uamport);
-    if (run_cmd(cmd) != 0)
-      syslog(LOG_WARNING, "ipt_filter_init: HTTP REDIRECT rule failed (non-fatal)");
+    int https_port = (uamuiport > 0) ? uamuiport : uamport;
 
     snprintf(cmd, sizeof(cmd),
              IPTABLES " -t nat -I PREROUTING 1 -i %s"
              " -m set ! --match-set " IPSET_NAME " src"
-             " -p tcp --dport 443 -j REDIRECT --to-port %d",
-             _iface, uamport);
+             " -p tcp --dport 80 -j DNAT --to-destination %s:%d",
+             _iface, _uamlisten, uamport);
     if (run_cmd(cmd) != 0)
-      syslog(LOG_WARNING, "ipt_filter_init: HTTPS REDIRECT rule failed (non-fatal)");
+      syslog(LOG_WARNING, "ipt_filter_init: HTTP DNAT rule failed (non-fatal)");
+
+    snprintf(cmd, sizeof(cmd),
+             IPTABLES " -t nat -I PREROUTING 1 -i %s"
+             " -m set ! --match-set " IPSET_NAME " src"
+             " -p tcp --dport 443 -j DNAT --to-destination %s:%d",
+             _iface, _uamlisten, https_port);
+    if (run_cmd(cmd) != 0)
+      syslog(LOG_WARNING, "ipt_filter_init: HTTPS DNAT rule failed (non-fatal)");
   }
 
   syslog(LOG_INFO,
          "ipt_filter_init: ipset " IPSET_NAME
-         " + FORWARD rules + HTTP REDIRECT (port %d) on %s",
-         uamport, _iface);
+         " + FORWARD rules + DNAT HTTP→%s:%d HTTPS→%s:%d on %s",
+         _uamlisten, uamport,
+         _uamlisten, (uamuiport > 0) ? uamuiport : uamport,
+         _iface);
   return 0;
 }
 
@@ -208,17 +235,19 @@ int ipt_filter_cleanup(void) {
   run_cmd(cmd);
 
   if (_uamport) {
+    int https_port = (_uamuiport > 0) ? _uamuiport : _uamport;
+
     snprintf(cmd, sizeof(cmd),
              IPTABLES " -t nat -D PREROUTING -i %s"
              " -m set ! --match-set " IPSET_NAME " src"
-             " -p tcp --dport 80 -j REDIRECT --to-port %d 2>/dev/null",
-             _iface, _uamport);
+             " -p tcp --dport 80 -j DNAT --to-destination %s:%d 2>/dev/null",
+             _iface, _uamlisten, _uamport);
     run_cmd(cmd);
     snprintf(cmd, sizeof(cmd),
              IPTABLES " -t nat -D PREROUTING -i %s"
              " -m set ! --match-set " IPSET_NAME " src"
-             " -p tcp --dport 443 -j REDIRECT --to-port %d 2>/dev/null",
-             _iface, _uamport);
+             " -p tcp --dport 443 -j DNAT --to-destination %s:%d 2>/dev/null",
+             _iface, _uamlisten, https_port);
     run_cmd(cmd);
   }
 

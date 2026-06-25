@@ -5342,7 +5342,13 @@ int chilli_main(int argc, char **argv) {
       tun_runscript(tun, _options.ipup, 0);
 
     /* Initialiser le filtrage nftables */
-    if (ipt_filter_init(_options.dhcpif, _options.uamport) != 0)
+    if (ipt_filter_init(_options.dhcpif, _options.uamlisten, _options.uamport,
+#ifdef ENABLE_UAMUIPORT
+                        _options.uamuissl ? _options.uamuiport : 0
+#else
+                        0
+#endif
+                        ) != 0)
       syslog(LOG_WARNING, "ipt_filter_init failed; packet filtering may not work");
 
     /* Ouvrir la socket IPC côté main (serveur pour NEW_CLIENT/GONE) */

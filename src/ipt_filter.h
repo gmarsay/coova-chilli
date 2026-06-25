@@ -17,11 +17,16 @@
 
 /*
  * Initialise l'ipset et les règles iptables-legacy.
- * |iface|   : interface DHCP (ex. "eth1").
- * |uamport| : port UAM (ex. 3990) — HTTP des clients non-authentifiés y est redirigé.
+ * |iface|     : interface DHCP (ex. "eth1").
+ * |uamlisten| : IP locale sur laquelle chilli_redir écoute (ex. 10.250.0.1).
+ * |uamport|   : port UAM HTTP (ex. 3990) — trafic port 80 redirigé ici.
+ * |uamuiport| : port UAM HTTPS (ex. 3991, 0 = désactivé) — trafic port 443
+ *               redirigé ici si > 0, sinon vers uamport.
+ * Utilise DNAT pour fixer IP+port explicitement (REDIRECT ne change que le port).
  * Doit être appelé une seule fois au démarrage de chilli (main).
  */
-int ipt_filter_init(const char *iface, uint16_t uamport);
+int ipt_filter_init(const char *iface, struct in_addr uamlisten,
+                    uint16_t uamport, uint16_t uamuiport);
 
 /* Ajoute une IP dans le set "chilli_authed" (client authentifié). */
 int ipt_filter_add_authed(struct in_addr *ip);
