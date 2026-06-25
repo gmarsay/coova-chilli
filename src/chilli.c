@@ -4000,7 +4000,9 @@ void chilli_print(bstring s, int listfmt,
           bassignformat(b, MAC_FMT" %s %s", MAC_ARG(conn->hismac),
                         inet_ntoa(conn->hisip), state2name(conn->authstate));
         else
-          bassignformat(b, "%s", inet_ntoa(appconn->hisip));
+          /* subprocess arch: no dhcp_conn_t, use MAC from app_conn_t */
+          bassignformat(b, MAC_FMT" %s", MAC_ARG(appconn->hismac),
+                        inet_ntoa(appconn->hisip));
 
         switch(listfmt) {
           case LIST_LONG_FMT:
@@ -5333,7 +5335,7 @@ int chilli_main(int argc, char **argv) {
       tun_runscript(tun, _options.ipup, 0);
 
     /* Initialiser le filtrage nftables */
-    if (ipt_filter_init(_options.dhcpif) != 0)
+    if (ipt_filter_init(_options.dhcpif, _options.uamport) != 0)
       syslog(LOG_WARNING, "ipt_filter_init failed; packet filtering may not work");
 
     /* Ouvrir la socket IPC côté main (serveur pour NEW_CLIENT/GONE) */

@@ -17,10 +17,11 @@
 
 /*
  * Initialise l'ipset et les règles iptables-legacy.
- * |iface| est l'interface DHCP (ex. "eth1").
+ * |iface|   : interface DHCP (ex. "eth1").
+ * |uamport| : port UAM (ex. 3990) — HTTP des clients non-authentifiés y est redirigé.
  * Doit être appelé une seule fois au démarrage de chilli (main).
  */
-int ipt_filter_init(const char *iface);
+int ipt_filter_init(const char *iface, uint16_t uamport);
 
 /* Ajoute une IP dans le set "chilli_authed" (client authentifié). */
 int ipt_filter_add_authed(struct in_addr *ip);

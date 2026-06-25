@@ -18,8 +18,9 @@
 #define IPSET_NAME "chilli_authed"
 #define IPTABLES   "iptables-legacy"
 
-/* Interface DHCP mémorisée à l'init pour le cleanup */
-static char _iface[64];
+/* Interface DHCP et uamport mémorisés à l'init pour le cleanup */
+static char     _iface[64];
+static uint16_t _uamport;
 
 /* ------------------------------------------------------------------ */
 /* Helper : exécute une commande, retourne 0 si succès                  */
@@ -41,11 +42,12 @@ static int run_cmd(const char *cmd) {
 /* API publique                                                          */
 /* ------------------------------------------------------------------ */
 
-int ipt_filter_init(const char *iface) {
+int ipt_filter_init(const char *iface, uint16_t uamport) {
   char cmd[512];
 
   strncpy(_iface, iface ? iface : "", sizeof(_iface) - 1);
   _iface[sizeof(_iface) - 1] = '\0';
+  _uamport = uamport;
 
   /* Nettoyage d'une configuration précédente (ignore les erreurs) */
   snprintf(cmd, sizeof(cmd),
@@ -60,6 +62,30 @@ int ipt_filter_init(const char *iface) {
            _iface);
   run_cmd(cmd);
 
+  /* Nettoyage REDIRECT NAT précédent */
+  if (uamport) {
+    snprintf(cmd, sizeof(cmd),
+             IPTABLES " -t nat -D PREROUTING -i %s"
+             " -m set ! --match-set " IPSET_NAME " src"
+             " -p tcp --dport 80 -j REDIRECT --to-port %d 2>/dev/null",
+             _iface, uamport);
+    run_cmd(cmd);
+    snprintf(cmd, sizeof(cmd),
+             IPTABLES " -t nat -D PREROUTING -i %s"
+             " -m set ! --match-set " IPSET_NAME " src"
+             " -p tcp --dport 443 -j REDIRECT --to-port %d 2>/dev/null",
+             _iface, uamport);
+    run_cmd(cmd);
+  }
+
+  /* Nettoyage DROP FORWARD précédents */
+  snprintf(cmd, sizeof(cmd),
+           IPTABLES " -D FORWARD -i %s -j DROP 2>/dev/null", _iface);
+  run_cmd(cmd);
+  snprintf(cmd, sizeof(cmd),
+           IPTABLES " -D FORWARD -o %s -j DROP 2>/dev/null", _iface);
+  run_cmd(cmd);
+
   run_cmd("ipset destroy " IPSET_NAME " 2>/dev/null");
 
   /* Crée le set (hash:ip, timeout 1h) */
@@ -69,7 +95,7 @@ int ipt_filter_init(const char *iface) {
     return -1;
   }
 
-  /* Règle src : trafic émis par un client authentifié */
+  /* Règle src : trafic émis par un client authentifié — ACCEPT avant les DROP */
   snprintf(cmd, sizeof(cmd),
            IPTABLES " -I FORWARD 1 -i %s"
            " -m set --match-set " IPSET_NAME " src -j ACCEPT",
@@ -87,7 +113,6 @@ int ipt_filter_init(const char *iface) {
            _iface);
   if (run_cmd(cmd) != 0) {
     syslog(LOG_ERR, "ipt_filter_init: iptables dst rule failed");
-    /* rollback src rule */
     snprintf(cmd, sizeof(cmd),
              IPTABLES " -D FORWARD -i %s"
              " -m set --match-set " IPSET_NAME " src -j ACCEPT",
@@ -97,9 +122,37 @@ int ipt_filter_init(const char *iface) {
     return -1;
   }
 
+  /* DROP : bloquer tout trafic FORWARD non-authentifié depuis/vers dhcpif */
+  snprintf(cmd, sizeof(cmd),
+           IPTABLES " -A FORWARD -i %s -j DROP", _iface);
+  run_cmd(cmd);
+  snprintf(cmd, sizeof(cmd),
+           IPTABLES " -A FORWARD -o %s -j DROP", _iface);
+  run_cmd(cmd);
+
+  /* REDIRECT : HTTP/HTTPS des non-authentifiés vers uamport */
+  if (uamport) {
+    snprintf(cmd, sizeof(cmd),
+             IPTABLES " -t nat -I PREROUTING 1 -i %s"
+             " -m set ! --match-set " IPSET_NAME " src"
+             " -p tcp --dport 80 -j REDIRECT --to-port %d",
+             _iface, uamport);
+    if (run_cmd(cmd) != 0)
+      syslog(LOG_WARNING, "ipt_filter_init: HTTP REDIRECT rule failed (non-fatal)");
+
+    snprintf(cmd, sizeof(cmd),
+             IPTABLES " -t nat -I PREROUTING 1 -i %s"
+             " -m set ! --match-set " IPSET_NAME " src"
+             " -p tcp --dport 443 -j REDIRECT --to-port %d",
+             _iface, uamport);
+    if (run_cmd(cmd) != 0)
+      syslog(LOG_WARNING, "ipt_filter_init: HTTPS REDIRECT rule failed (non-fatal)");
+  }
+
   syslog(LOG_INFO,
          "ipt_filter_init: ipset " IPSET_NAME
-         " + iptables-legacy FORWARD rules on %s", _iface);
+         " + FORWARD rules + HTTP REDIRECT (port %d) on %s",
+         uamport, _iface);
   return 0;
 }
 
@@ -147,8 +200,30 @@ int ipt_filter_cleanup(void) {
            _iface);
   run_cmd(cmd);
 
+  snprintf(cmd, sizeof(cmd),
+           IPTABLES " -D FORWARD -i %s -j DROP 2>/dev/null", _iface);
+  run_cmd(cmd);
+  snprintf(cmd, sizeof(cmd),
+           IPTABLES " -D FORWARD -o %s -j DROP 2>/dev/null", _iface);
+  run_cmd(cmd);
+
+  if (_uamport) {
+    snprintf(cmd, sizeof(cmd),
+             IPTABLES " -t nat -D PREROUTING -i %s"
+             " -m set ! --match-set " IPSET_NAME " src"
+             " -p tcp --dport 80 -j REDIRECT --to-port %d 2>/dev/null",
+             _iface, _uamport);
+    run_cmd(cmd);
+    snprintf(cmd, sizeof(cmd),
+             IPTABLES " -t nat -D PREROUTING -i %s"
+             " -m set ! --match-set " IPSET_NAME " src"
+             " -p tcp --dport 443 -j REDIRECT --to-port %d 2>/dev/null",
+             _iface, _uamport);
+    run_cmd(cmd);
+  }
+
   run_cmd("ipset destroy " IPSET_NAME " 2>/dev/null");
 
-  syslog(LOG_INFO, "ipt_filter_cleanup: ipset " IPSET_NAME " destroyed");
+  syslog(LOG_INFO, "ipt_filter_cleanup: rules and ipset " IPSET_NAME " removed");
   return 0;
 }
