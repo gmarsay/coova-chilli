@@ -38,6 +38,7 @@ struct dhcp_local_client {
   uint32_t ip;
   uint8_t  authstate;  /* DHCP_AUTH_* */
   uint16_t vlan;
+  struct ippoolm_t *ipm;  /* pool member for IP release */
 };
 
 static struct dhcp_local_client local_clients[DHCP_LOCAL_MAX];
@@ -113,10 +114,13 @@ static int cb_local_dhcp_connect(struct dhcp_conn_t *conn) {
 static int cb_local_dhcp_disconnect(struct dhcp_conn_t *conn, int term_cause) {
   dhcpipc_gone_reason_t reason;
 
-  /* Release IP back to pool before dhcp_freeconn zeros conn->uplink */
-  if (conn->uplink) {
-    ippool_freeip(ippool_g, (struct ippoolm_t *)conn->uplink);
-    conn->uplink = NULL;
+  /* Release IP back to pool */
+  {
+    struct dhcp_local_client *lc = local_client_find(conn->hismac);
+    if (lc && lc->ipm) {
+      ippool_freeip(ippool_g, lc->ipm);
+      lc->ipm = NULL;
+    }
   }
 
   switch (term_cause) {
@@ -157,15 +161,15 @@ static int cb_local_dhcp_request(struct dhcp_conn_t *conn,
     }
   }
 
-  conn->hisip      = ipm->addr;
-  conn->hismask    = _options.mask;
-  conn->ourip      = dhcp_g->ourip;
-  conn->uplink     = ipm;   /* needed for IP release in cb_local_dhcp_disconnect */
-  ipm->peer        = conn;  /* needed for pool-level lookups in dhcp.c */
+  conn->hisip   = ipm->addr;
+  conn->hismask = _options.mask;
+  conn->ourip   = dhcp_g->ourip;
+  ipm->peer     = conn;  /* needed for pool-level lookups in dhcp.c */
 
   /* Notify main process now that we have a real IP */
   {
     struct dhcp_local_client *lc = local_client_find(conn->hismac);
+    if (lc) lc->ipm = ipm;
     uint16_t vlan = lc ? lc->vlan : 0;
     if (lc) lc->ip = conn->hisip.s_addr;
     syslog(LOG_INFO, "chilli_dhcp: new client MAC="MAC_FMT" IP=%s",

@@ -2051,6 +2051,9 @@ int cb_tun_ind(struct tun_t *tun, struct pkt_buffer *pb, int idx) {
 #if !defined(ENABLE_MULTIROUTE) && !defined(ENABLE_TAP)
   (void)idx;
 #endif
+#ifndef ENABLE_TAP
+  (void)tun;
+#endif
   struct in_addr dst;
   struct app_conn_t *appconn = 0;
   struct pkt_udphdr_t *udph = 0;
