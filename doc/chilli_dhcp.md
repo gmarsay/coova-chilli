@@ -85,20 +85,40 @@ By default:
 | main server | `/var/run/chilli.dhcp` | `chilli` |
 | dhcp server | `/var/run/chilli.dhcp.d` | `chilli_dhcp` |
 
-The base path can be changed with `--dhcpsocket <path>` in `chilli.conf`.
+The base path can be changed with `--dhcpsocket <path>` (command line or
+`dhcpsocket <path>` in `chilli.conf`). Each instance running on the same
+host must use a distinct path.
 
 ### Packet Filtering (iptables-legacy + ipset)
 
-`chilli` manages an ipset `chilli_authed` (type `hash:ip`, timeout 1 hour)
-and two iptables-legacy rules in the `FORWARD` chain:
+`chilli` manages an ipset `chilli_authed_<s>` (type `hash:ip`, timeout
+1 hour) and two dedicated iptables-legacy chains `CHILLI_FWD_<s>` (filter)
+and `CHILLI_NAT_<s>` (nat), where `<s>` is the instance suffix derived from
+`radiusnasid` (default `nas01`): every character outside `[A-Za-z0-9_]` is
+replaced by `_` and the suffix is truncated to 17 characters (a warning is
+logged when this happens). Several `chilli` instances can therefore share
+the same host as long as their `radiusnasid` values (after sanitization)
+differ.
 
 ```
-# Inserted at startup (via iptables-legacy -I FORWARD 1)
--i <dhcpif> -m set --match-set chilli_authed src -j ACCEPT
--o <dhcpif> -m set --match-set chilli_authed dst -j ACCEPT
+# Inserted at startup (example with radiusnasid "nas01")
+-t nat -I PREROUTING 1 -i <dhcpif> -j CHILLI_NAT_nas01
+-I FORWARD 1 -i <dhcpif> -j CHILLI_FWD_nas01
+-I FORWARD 1 -o <dhcpif> -j CHILLI_FWD_nas01
+# CHILLI_FWD_nas01
+-m set --match-set chilli_authed_nas01 src -j ACCEPT
+-m set --match-set chilli_authed_nas01 dst -j ACCEPT
+-j DROP
+# CHILLI_NAT_nas01 (unauthenticated HTTP/HTTPS → UAM)
+-m set ! --match-set chilli_authed_nas01 src -p tcp --dport 80  -j DNAT ...
+-m set ! --match-set chilli_authed_nas01 src -p tcp --dport 443 -j DNAT ...
 ```
 
-When a session is authenticated, the client IP is added to `chilli_authed`;
+At startup, the jumps from `<dhcpif>` to the former fixed-name objects
+(`CHILLI_FWD`, `CHILLI_NAT`, `chilli_authed`) are removed, and those
+objects are deleted only if no other (older) instance still references them.
+
+When a session is authenticated, the client IP is added to `chilli_authed_<s>`;
 on deauthentication or disconnect it is removed.  The set has a 1-hour
 per-entry timeout as a safety net against missed removes.
 

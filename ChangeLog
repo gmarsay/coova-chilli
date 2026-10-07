@@ -1,4 +1,6 @@
 == ChangeLog (CoovaChilli-v1.8) ==
+* `meson install` now creates the run-state directory (`runstatedir`, DEFSTATEDIR) via `install_emptydir`; requires Meson >= 0.60.
+* ipt_filter: per-instance ipset/chain names suffixed with sanitized `radiusnasid` (`chilli_authed_<s>`, `CHILLI_FWD_<s>`, `CHILLI_NAT_<s>`) so several instances can share a host; legacy fixed names cleaned up when unused; wire the `--dhcpsocket` option. Also: `iptables-legacy -w 5` (xtables lock), fix missing `-t nat` on the two DNAT rules, and call `ipt_filter_cleanup()` at shutdown.
 * Remove leftover Automake `Makefile.in` under `src/`; drop stale `doc/chilli.conf`; keep generated `cmdline.c`/`cmdline.h` only in Meson build directory (not in VCS).
 * `doc/meson.build`: stop installing removed extras `hotspotlogin.cgi` and `firewall.openwrt` (not shipped in tree).
 * Build system: Autotools removed; Meson + Ninja is the only supported build.

@@ -2,9 +2,10 @@
 /*
  * ipt_filter.c — Filtrage kernel via iptables-legacy + ipset
  *
- * Utilise des chaînes dédiées CHILLI_FWD et CHILLI_NAT pour un
- * cleanup atomique (flush de chaîne) et éviter les accumulations
- * de règles lors de redémarrages.
+ * Utilise des chaînes dédiées CHILLI_FWD_<nasid> et CHILLI_NAT_<nasid>
+ * (et l'ipset chilli_authed_<nasid>) pour un cleanup atomique (flush de
+ * chaîne), éviter les accumulations de règles lors de redémarrages et
+ * permettre plusieurs instances chilli sur le même hôte.
  */
 
 #include <stdio.h>
@@ -14,16 +15,61 @@
 
 #include "ipt_filter.h"
 
-#define IPSET_NAME    "chilli_authed"
-#define IPTABLES      "iptables-legacy"
-#define CHAIN_FWD     "CHILLI_FWD"
-#define CHAIN_NAT     "CHILLI_NAT"
+#define IPTABLES      "iptables-legacy -w 5"
+
+/* Anciens noms fixes (versions précédentes, une seule instance par hôte) */
+#define LEGACY_IPSET      "chilli_authed"
+#define LEGACY_CHAIN_FWD  "CHILLI_FWD"
+#define LEGACY_CHAIN_NAT  "CHILLI_NAT"
+
+/* Longueur max du suffixe : "chilli_authed_" (14) + 17 = 31 (limite ipset),
+ * "CHILLI_FWD_" (11) + 17 = 28 (limite chaîne iptables). */
+#define SUFFIX_MAX    17
 
 /* État mémorisé pour le cleanup */
+static char     _set[32];
+static char     _fwd[32];
+static char     _nat[32];
 static char     _iface[64];
 static char     _uamlisten[INET_ADDRSTRLEN];
 static uint16_t _uamport;
 static uint16_t _uamuiport;
+
+/* ------------------------------------------------------------------ */
+/* ipt_filter_names : noms ipset/chaînes dérivés de l'instance (nasid)  */
+/* ------------------------------------------------------------------ */
+int ipt_filter_names(const char *instance,
+                     char *set, size_t setlen,
+                     char *fwd, size_t fwdlen,
+                     char *nat, size_t natlen) {
+  char sfx[SUFFIX_MAX + 1];
+  size_t i;
+  int changed = 0;
+
+  if (!instance || !*instance)
+    instance = "default";
+
+  /* Sécurité : le suffixe est interpolé dans des commandes popen(),
+   * seuls [A-Za-z0-9_] sont conservés. */
+  for (i = 0; instance[i] && i < SUFFIX_MAX; i++) {
+    char c = instance[i];
+    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+        (c >= '0' && c <= '9') || c == '_') {
+      sfx[i] = c;
+    } else {
+      sfx[i] = '_';
+      changed = 1;
+    }
+  }
+  sfx[i] = '\0';
+  if (instance[i])
+    changed = 1; /* tronqué */
+
+  snprintf(set, setlen, "chilli_authed_%s", sfx);
+  snprintf(fwd, fwdlen, "CHILLI_FWD_%s", sfx);
+  snprintf(nat, natlen, "CHILLI_NAT_%s", sfx);
+  return changed;
+}
 
 /* ------------------------------------------------------------------ */
 /* run_cmd : exécute cmd, retourne 0 si succès                          */
@@ -67,36 +113,40 @@ static int run_cmd_log(const char *cmd) {
 /* _flush_chains : vide nos chaînes pour libérer les refs à l'ipset    */
 /* ------------------------------------------------------------------ */
 static void _flush_chains(void) {
-  /* Vide les chaînes dédiées → toutes les refs à chilli_authed supprimées */
-  run_cmd(IPTABLES " -t nat -F " CHAIN_NAT " 2>/dev/null");
-  run_cmd(IPTABLES " -F " CHAIN_FWD " 2>/dev/null");
-
-  /* Rétrocompatibilité : règles directes dans PREROUTING/FORWARD */
   char cmd[512];
+
+  /* Vide les chaînes dédiées → toutes les refs à notre ipset supprimées */
+  snprintf(cmd, sizeof(cmd), IPTABLES " -t nat -F %s 2>/dev/null", _nat);
+  run_cmd(cmd);
+  snprintf(cmd, sizeof(cmd), IPTABLES " -F %s 2>/dev/null", _fwd);
+  run_cmd(cmd);
+
+  /* Rétrocompatibilité : règles directes dans PREROUTING/FORWARD
+   * (anciennes versions, ipset au nom fixe) */
   snprintf(cmd, sizeof(cmd),
            IPTABLES " -D FORWARD -i %s"
-           " -m set --match-set " IPSET_NAME " src -j ACCEPT 2>/dev/null",
+           " -m set --match-set " LEGACY_IPSET " src -j ACCEPT 2>/dev/null",
            _iface);
   run_cmd(cmd);
   snprintf(cmd, sizeof(cmd),
            IPTABLES " -D FORWARD -o %s"
-           " -m set --match-set " IPSET_NAME " dst -j ACCEPT 2>/dev/null",
+           " -m set --match-set " LEGACY_IPSET " dst -j ACCEPT 2>/dev/null",
            _iface);
   run_cmd(cmd);
   /* Peut en rester plusieurs → boucle */
   int i;
   for (i = 0; i < 5; i++) {
     if (run_cmd(IPTABLES " -t nat -D PREROUTING"
-                " -m set ! --match-set " IPSET_NAME " src"
+                " -m set ! --match-set " LEGACY_IPSET " src"
                 " -p tcp --dport 80 -j REDIRECT 2>/dev/null") != 0 &&
         run_cmd(IPTABLES " -t nat -D PREROUTING"
-                " -m set ! --match-set " IPSET_NAME " src"
+                " -m set ! --match-set " LEGACY_IPSET " src"
                 " -p tcp --dport 443 -j REDIRECT 2>/dev/null") != 0 &&
         run_cmd(IPTABLES " -t nat -D PREROUTING"
-                " -m set ! --match-set " IPSET_NAME " src"
+                " -m set ! --match-set " LEGACY_IPSET " src"
                 " -p tcp --dport 80 -j DNAT 2>/dev/null") != 0 &&
         run_cmd(IPTABLES " -t nat -D PREROUTING"
-                " -m set ! --match-set " IPSET_NAME " src"
+                " -m set ! --match-set " LEGACY_IPSET " src"
                 " -p tcp --dport 443 -j DNAT 2>/dev/null") != 0)
       break;
   }
@@ -107,8 +157,15 @@ static void _flush_chains(void) {
 /* ------------------------------------------------------------------ */
 
 int ipt_filter_init(const char *iface, struct in_addr uamlisten,
-                    uint16_t uamport, uint16_t uamuiport) {
+                    uint16_t uamport, uint16_t uamuiport,
+                    const char *instance) {
   char cmd[512];
+
+  if (ipt_filter_names(instance, _set, sizeof(_set), _fwd, sizeof(_fwd),
+                       _nat, sizeof(_nat)))
+    syslog(LOG_WARNING,
+           "ipt_filter_init: radiusnasid sanitized/truncated for netfilter"
+           " names: ipset=%s chains=%s,%s", _set, _fwd, _nat);
 
   strncpy(_iface, iface ? iface : "", sizeof(_iface) - 1);
   _iface[sizeof(_iface) - 1] = '\0';
@@ -125,15 +182,36 @@ int ipt_filter_init(const char *iface, struct in_addr uamlisten,
 
   /* 2. Supprimer les sauts vers nos chaînes (s'ils existent) */
   snprintf(cmd, sizeof(cmd),
-           IPTABLES " -t nat -D PREROUTING -i %s -j " CHAIN_NAT " 2>/dev/null",
+           IPTABLES " -t nat -D PREROUTING -i %s -j %s 2>/dev/null",
+           _iface, _nat);
+  run_cmd(cmd);
+  snprintf(cmd, sizeof(cmd),
+           IPTABLES " -D FORWARD -i %s -j %s 2>/dev/null", _iface, _fwd);
+  run_cmd(cmd);
+  snprintf(cmd, sizeof(cmd),
+           IPTABLES " -D FORWARD -o %s -j %s 2>/dev/null", _iface, _fwd);
+  run_cmd(cmd);
+
+  /* 2b. Migration : sauts vers les anciennes chaînes au nom fixe, pour
+   * notre interface uniquement. */
+  snprintf(cmd, sizeof(cmd),
+           IPTABLES " -t nat -D PREROUTING -i %s -j " LEGACY_CHAIN_NAT
+           " 2>/dev/null", _iface);
+  run_cmd(cmd);
+  snprintf(cmd, sizeof(cmd),
+           IPTABLES " -D FORWARD -i %s -j " LEGACY_CHAIN_FWD " 2>/dev/null",
            _iface);
   run_cmd(cmd);
   snprintf(cmd, sizeof(cmd),
-           IPTABLES " -D FORWARD -i %s -j " CHAIN_FWD " 2>/dev/null", _iface);
+           IPTABLES " -D FORWARD -o %s -j " LEGACY_CHAIN_FWD " 2>/dev/null",
+           _iface);
   run_cmd(cmd);
-  snprintf(cmd, sizeof(cmd),
-           IPTABLES " -D FORWARD -o %s -j " CHAIN_FWD " 2>/dev/null", _iface);
-  run_cmd(cmd);
+  /* ponytail: pas de flush des objets legacy — -X et destroy échouent tant
+   * qu'une instance d'ancienne version les référence encore ; ils ne sont
+   * supprimés que lorsque plus personne ne les utilise. */
+  run_cmd(IPTABLES " -t nat -X " LEGACY_CHAIN_NAT " 2>/dev/null");
+  run_cmd(IPTABLES " -X " LEGACY_CHAIN_FWD " 2>/dev/null");
+  run_cmd("ipset destroy " LEGACY_IPSET " 2>/dev/null");
 
   /* Nettoyage DROP FORWARD précédents */
   snprintf(cmd, sizeof(cmd),
@@ -144,94 +222,103 @@ int ipt_filter_init(const char *iface, struct in_addr uamlisten,
   run_cmd(cmd);
 
   /* 3. Détruire et recréer l'ipset */
-  run_cmd("ipset destroy " IPSET_NAME " 2>/dev/null");
-  if (run_cmd_log("ipset create " IPSET_NAME
-                  " hash:ip hashsize 1024 maxelem 65536 timeout 3600") != 0) {
+  snprintf(cmd, sizeof(cmd), "ipset destroy %s 2>/dev/null", _set);
+  run_cmd(cmd);
+  snprintf(cmd, sizeof(cmd),
+           "ipset create %s hash:ip hashsize 1024 maxelem 65536 timeout 3600",
+           _set);
+  if (run_cmd_log(cmd) != 0) {
     /* Le set existe encore (référence externe) — flush et réutilise */
     syslog(LOG_WARNING,
            "ipt_filter_init: ipset destroy failed (external ref?); flushing");
-    if (run_cmd_log("ipset flush " IPSET_NAME) != 0) {
+    snprintf(cmd, sizeof(cmd), "ipset flush %s", _set);
+    if (run_cmd_log(cmd) != 0) {
       syslog(LOG_ERR, "ipt_filter_init: cannot create or flush ipset, aborting");
       return -1;
     }
   }
 
   /* 4. Créer nos chaînes dédiées */
-  run_cmd(IPTABLES " -t nat -N " CHAIN_NAT " 2>/dev/null");
-  run_cmd(IPTABLES " -N " CHAIN_FWD " 2>/dev/null");
+  snprintf(cmd, sizeof(cmd), IPTABLES " -t nat -N %s 2>/dev/null", _nat);
+  run_cmd(cmd);
+  snprintf(cmd, sizeof(cmd), IPTABLES " -N %s 2>/dev/null", _fwd);
+  run_cmd(cmd);
 
   /* 5. Ajouter les sauts depuis PREROUTING et FORWARD vers nos chaînes */
   snprintf(cmd, sizeof(cmd),
-           IPTABLES " -t nat -I PREROUTING 1 -i %s -j " CHAIN_NAT, _iface);
+           IPTABLES " -t nat -I PREROUTING 1 -i %s -j %s", _iface, _nat);
   if (run_cmd_log(cmd) != 0) {
     syslog(LOG_ERR, "ipt_filter_init: NAT PREROUTING jump failed");
-    run_cmd("ipset destroy " IPSET_NAME " 2>/dev/null");
+    snprintf(cmd, sizeof(cmd), "ipset destroy %s 2>/dev/null", _set);
+    run_cmd(cmd);
     return -1;
   }
 
   snprintf(cmd, sizeof(cmd),
-           IPTABLES " -I FORWARD 1 -i %s -j " CHAIN_FWD, _iface);
+           IPTABLES " -I FORWARD 1 -i %s -j %s", _iface, _fwd);
   if (run_cmd_log(cmd) != 0) {
     syslog(LOG_ERR, "ipt_filter_init: FORWARD in jump failed");
-    run_cmd("ipset destroy " IPSET_NAME " 2>/dev/null");
+    snprintf(cmd, sizeof(cmd), "ipset destroy %s 2>/dev/null", _set);
+    run_cmd(cmd);
     return -1;
   }
 
   snprintf(cmd, sizeof(cmd),
-           IPTABLES " -I FORWARD 1 -o %s -j " CHAIN_FWD, _iface);
+           IPTABLES " -I FORWARD 1 -o %s -j %s", _iface, _fwd);
   if (run_cmd_log(cmd) != 0) {
     syslog(LOG_ERR, "ipt_filter_init: FORWARD out jump failed");
-    run_cmd("ipset destroy " IPSET_NAME " 2>/dev/null");
+    snprintf(cmd, sizeof(cmd), "ipset destroy %s 2>/dev/null", _set);
+    run_cmd(cmd);
     return -1;
   }
 
-  /* 6. Règles FORWARD dans CHILLI_FWD */
+  /* 6. Règles FORWARD dans CHILLI_FWD_<nasid> */
   snprintf(cmd, sizeof(cmd),
-           IPTABLES " -A " CHAIN_FWD
-           " -m set --match-set " IPSET_NAME " src -j ACCEPT");
+           IPTABLES " -A %s -m set --match-set %s src -j ACCEPT", _fwd, _set);
   if (run_cmd_log(cmd) != 0) {
     syslog(LOG_ERR, "ipt_filter_init: FORWARD ACCEPT src failed");
-    run_cmd("ipset destroy " IPSET_NAME " 2>/dev/null");
+    snprintf(cmd, sizeof(cmd), "ipset destroy %s 2>/dev/null", _set);
+    run_cmd(cmd);
     return -1;
   }
 
   snprintf(cmd, sizeof(cmd),
-           IPTABLES " -A " CHAIN_FWD
-           " -m set --match-set " IPSET_NAME " dst -j ACCEPT");
+           IPTABLES " -A %s -m set --match-set %s dst -j ACCEPT", _fwd, _set);
   if (run_cmd_log(cmd) != 0) {
     syslog(LOG_ERR, "ipt_filter_init: FORWARD ACCEPT dst failed");
-    run_cmd("ipset destroy " IPSET_NAME " 2>/dev/null");
+    snprintf(cmd, sizeof(cmd), "ipset destroy %s 2>/dev/null", _set);
+    run_cmd(cmd);
     return -1;
   }
 
-  run_cmd(IPTABLES " -A " CHAIN_FWD " -j DROP");
+  snprintf(cmd, sizeof(cmd), IPTABLES " -A %s -j DROP", _fwd);
+  run_cmd(cmd);
 
-  /* 7. Règles DNAT dans CHILLI_NAT */
+  /* 7. Règles DNAT dans CHILLI_NAT_<nasid> */
   if (uamport) {
     int https_port = (uamuiport > 0) ? uamuiport : uamport;
 
     snprintf(cmd, sizeof(cmd),
-             IPTABLES " -A " CHAIN_NAT
-             " -m set ! --match-set " IPSET_NAME " src"
+             IPTABLES " -t nat -A %s -m set ! --match-set %s src"
              " -p tcp --dport 80 -j DNAT --to-destination %s:%d",
-             _uamlisten, uamport);
+             _nat, _set, _uamlisten, uamport);
     if (run_cmd_log(cmd) != 0)
       syslog(LOG_WARNING, "ipt_filter_init: HTTP DNAT failed (check xt_DNAT module)");
 
     snprintf(cmd, sizeof(cmd),
-             IPTABLES " -A " CHAIN_NAT
-             " -m set ! --match-set " IPSET_NAME " src"
+             IPTABLES " -t nat -A %s -m set ! --match-set %s src"
              " -p tcp --dport 443 -j DNAT --to-destination %s:%d",
-             _uamlisten, https_port);
+             _nat, _set, _uamlisten, https_port);
     if (run_cmd_log(cmd) != 0)
       syslog(LOG_WARNING, "ipt_filter_init: HTTPS DNAT failed (check xt_DNAT module)");
   }
 
   syslog(LOG_INFO,
-         "ipt_filter_init: OK — DNAT HTTP→%s:%d HTTPS→%s:%d on %s",
+         "ipt_filter_init: OK — DNAT HTTP→%s:%d HTTPS→%s:%d on %s"
+         " (ipset=%s chains=%s,%s)",
          _uamlisten, uamport,
          _uamlisten, (uamuiport > 0) ? uamuiport : uamport,
-         _iface);
+         _iface, _set, _fwd, _nat);
   return 0;
 }
 
@@ -244,7 +331,7 @@ int ipt_filter_add_authed(struct in_addr *ip) {
     return -1;
   }
 
-  snprintf(cmd, sizeof(cmd), "ipset add " IPSET_NAME " %s", ipstr);
+  snprintf(cmd, sizeof(cmd), "ipset add %s %s", _set, ipstr);
   return run_cmd(cmd);
 }
 
@@ -257,8 +344,7 @@ int ipt_filter_del_authed(struct in_addr *ip) {
     return -1;
   }
 
-  snprintf(cmd, sizeof(cmd),
-           "ipset del " IPSET_NAME " %s 2>/dev/null", ipstr);
+  snprintf(cmd, sizeof(cmd), "ipset del %s %s 2>/dev/null", _set, ipstr);
   run_cmd(cmd);
   return 0;
 }
@@ -271,14 +357,14 @@ int ipt_filter_cleanup(void) {
 
   /* Supprimer les sauts */
   snprintf(cmd, sizeof(cmd),
-           IPTABLES " -t nat -D PREROUTING -i %s -j " CHAIN_NAT " 2>/dev/null",
-           _iface);
+           IPTABLES " -t nat -D PREROUTING -i %s -j %s 2>/dev/null",
+           _iface, _nat);
   run_cmd(cmd);
   snprintf(cmd, sizeof(cmd),
-           IPTABLES " -D FORWARD -i %s -j " CHAIN_FWD " 2>/dev/null", _iface);
+           IPTABLES " -D FORWARD -i %s -j %s 2>/dev/null", _iface, _fwd);
   run_cmd(cmd);
   snprintf(cmd, sizeof(cmd),
-           IPTABLES " -D FORWARD -o %s -j " CHAIN_FWD " 2>/dev/null", _iface);
+           IPTABLES " -D FORWARD -o %s -j %s 2>/dev/null", _iface, _fwd);
   run_cmd(cmd);
 
   /* DROP FORWARD legacy */
@@ -290,11 +376,14 @@ int ipt_filter_cleanup(void) {
   run_cmd(cmd);
 
   /* Détruire les chaînes */
-  run_cmd(IPTABLES " -t nat -X " CHAIN_NAT " 2>/dev/null");
-  run_cmd(IPTABLES " -X " CHAIN_FWD " 2>/dev/null");
+  snprintf(cmd, sizeof(cmd), IPTABLES " -t nat -X %s 2>/dev/null", _nat);
+  run_cmd(cmd);
+  snprintf(cmd, sizeof(cmd), IPTABLES " -X %s 2>/dev/null", _fwd);
+  run_cmd(cmd);
 
   /* Détruire l'ipset */
-  run_cmd("ipset destroy " IPSET_NAME " 2>/dev/null");
+  snprintf(cmd, sizeof(cmd), "ipset destroy %s 2>/dev/null", _set);
+  run_cmd(cmd);
 
   syslog(LOG_INFO, "ipt_filter_cleanup: done");
   return 0;

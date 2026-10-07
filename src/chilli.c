@@ -5341,14 +5341,14 @@ int chilli_main(int argc, char **argv) {
     if (_options.ipup)
       tun_runscript(tun, _options.ipup, 0);
 
-    /* Initialiser le filtrage nftables */
+    /* Initialiser le filtrage iptables/ipset (noms suffixés par radiusnasid) */
     if (ipt_filter_init(_options.dhcpif, _options.uamlisten, _options.uamport,
 #ifdef ENABLE_UAMUIPORT
                         _options.uamuissl ? _options.uamuiport : 0
 #else
                         0
 #endif
-                        ) != 0)
+                        , _options.radiusnasid) != 0)
       syslog(LOG_WARNING, "ipt_filter_init failed; packet filtering may not work");
 
     /* Ouvrir la socket IPC côté main (serveur pour NEW_CLIENT/GONE) */
@@ -5643,6 +5643,9 @@ int chilli_main(int argc, char **argv) {
 
     if (_options.ipdown)
       tun_runscript(tun, _options.ipdown, 1);
+
+    /* Retirer nos règles iptables et détruire notre ipset */
+    ipt_filter_cleanup();
 
     if (redir)
       redir_free(redir);

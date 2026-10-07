@@ -364,3 +364,13 @@ install_headers(
   ),
   install_dir: join_paths(get_option('includedir'), 'chilli'),
 )
+
+# Test unitaire : noms ipset/chaînes par instance (ne touche pas iptables)
+test('ipt_filter_names',
+  executable(
+    'ipt_filter_names_test',
+    files('tests/ipt_filter_names_test.c', 'ipt_filter.c'),
+    include_directories: inc,
+    build_by_default: false,
+  ),
+)

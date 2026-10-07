@@ -88,6 +88,7 @@ option "noradallow"         - "Allow all sessions when RADIUS is not available" 
 
 # DHCP parameters
 option "dhcpif"      - "Local Ethernet interface"    string no
+option "dhcpsocket"  - "Path of the chilli_dhcp IPC socket (default /var/run/chilli.dhcp)" string no
 option "dhcpmac"     - "DHCP Interface MAC Address"       string no
 option "dhcpmacset"  - "Option to have dhcpif configured with dhcpmac" flag off
 option "nexthop"     - "Next Hop MAC address"       string no

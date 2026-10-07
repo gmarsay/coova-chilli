@@ -2,7 +2,7 @@ project(
   'coova-chilli',
   'c',
   version: '1.8',
-  meson_version: '>= 0.59.0',
+  meson_version: '>= 0.60.0',
   license: 'GPL-2.0-or-later',
   default_options: [
     'c_std=c99',
@@ -28,6 +28,9 @@ sysconfdir = join_paths(prefix, get_option('sysconfdir'))
 sbindir = join_paths(prefix, get_option('sbindir'))
 localstatedir = join_paths(prefix, get_option('localstatedir'))
 runstatedir = join_paths(localstatedir, 'run')
+
+# Répertoire d'état (DEFSTATEDIR) : chilli y écrit chilli.<pid>.cfg.bin au démarrage
+install_emptydir(runstatedir)
 
 add_project_arguments(
   '-DDEFCHILLICONF="@0@"'.format(join_paths(sysconfdir, 'chilli.conf')),

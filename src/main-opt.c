@@ -835,6 +835,7 @@ int main(int argc, char **argv) {
 #endif
   _options.cmdsocket = STRDUP(args_info.cmdsocket_arg);
   _options.cmdsocketport = args_info.cmdsocketport_arg;
+  _options.dhcpsocket = STRDUP(args_info.dhcpsocket_arg);
   _options.domain = STRDUP(args_info.domain_arg);
   _options.ipup = STRDUP(args_info.ipup_arg);
   _options.ipdown = STRDUP(args_info.ipdown_arg);
