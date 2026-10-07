@@ -1,0 +1,32 @@
+# One shared netns (sidecar) + N chilli containers with their own filesystem,
+# mimicking prod (host networking, isolated /var/run).
+x-chilli: &chilli
+  image: chilli-multi
+  network_mode: "service:netns"
+  cap_add: [NET_ADMIN]
+  devices: ["/dev/net/tun"]
+  depends_on: [netns]
+  # Shared xtables lock so "iptables -w" serializes across containers (prod must do the same).
+  volumes: ["xtlock:/xtlock"]
+  environment: { XTABLES_LOCKFILE: /xtlock/xtables.lock }
+
+services:
+  netns:
+    image: chilli-multi
+    build: { context: ../.., dockerfile: docker/multi/Dockerfile }
+    command: sleep infinity
+    cap_add: [NET_ADMIN]
+    devices: ["/dev/net/tun"]
+
+  chilli-a:
+    <<: *chilli
+    environment: { DHCPIF: vetha, XTABLES_LOCKFILE: /xtlock/xtables.lock }
+    volumes: ["xtlock:/xtlock", "./instances/a/chilli.conf:/etc/chilli/chilli.conf:ro"]
+
+  chilli-b:
+    <<: *chilli
+    environment: { DHCPIF: vethb, START_DELAY: "${STAGGER:-0}", XTABLES_LOCKFILE: /xtlock/xtables.lock }
+    volumes: ["xtlock:/xtlock", "./instances/b/chilli.conf:/etc/chilli/chilli.conf:ro"]
+
+volumes:
+  xtlock: {}
