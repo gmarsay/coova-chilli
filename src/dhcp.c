@@ -546,12 +546,6 @@ int dhcp_freeconn(struct dhcp_conn_t *conn, int term_cause)
     syslog(LOG_DEBUG, "%s(%d): DHCP freeconn: "MAC_FMT, __FUNCTION__, __LINE__,
            MAC_ARG(conn->hismac));
 
-#ifdef HAVE_NETFILTER_COOVA
-  if (_options.kname) {
-    kmod_coova_release(conn);
-  }
-#endif
-
   /* Application specific code */
   /* First remove from hash table */
   dhcp_hashdel(this, conn);
@@ -1339,7 +1333,7 @@ size_t tcprst(uint8_t *tcp_pack, uint8_t *orig_pack, char reverse) {
 #ifdef ENABLE_TCPRESET
 static
 void tun_sendRESET(struct tun_t *tun, uint8_t *pack, struct app_conn_t *appconn) {
-#if !defined(HAVE_NETFILTER_QUEUE) && !defined(HAVE_NETFILTER_COOVA)
+#ifndef HAVE_NETFILTER_QUEUE
   uint8_t tcp_pack[1500];
   tun_encaps(tun, tcp_pack, tcprst(tcp_pack, pack, 1), appconn->s_params.routeidx);
 #endif
@@ -1347,7 +1341,7 @@ void tun_sendRESET(struct tun_t *tun, uint8_t *pack, struct app_conn_t *appconn)
 
 static
 void dhcp_sendRESET(struct dhcp_conn_t *conn, uint8_t *pack, char reverse) {
-#if !defined(HAVE_NETFILTER_QUEUE) && !defined(HAVE_NETFILTER_COOVA)
+#ifndef HAVE_NETFILTER_QUEUE
   uint8_t tcp_pack[1500];
   struct dhcp_t *this = conn->parent;
   dhcp_send(this, dhcp_conn_idx(conn), conn->hismac, tcp_pack, tcprst(tcp_pack, pack, reverse));
@@ -3674,16 +3668,6 @@ int dhcp_receive_ip(struct dhcp_ctx *ctx, uint8_t *pack, size_t len) {
     case DHCP_AUTH_PASS:
 #ifdef HAVE_NETFILTER_QUEUE
       if (this->qif_in.fd && this->qif_out.fd) {
-        return 1;
-      }
-#endif
-#ifdef HAVE_NETFILTER_COOVA
-      if (_options.kname) {
-        if (conn->peer) {
-          appconn = (struct app_conn_t *)conn->peer;
-          appconn->s_state.last_up_time =
-              appconn->s_state.last_time = mainclock_now();
-        }
         return 1;
       }
 #endif

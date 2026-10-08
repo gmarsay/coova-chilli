@@ -24,10 +24,6 @@ foreach d : [
   conf.set10(d, true)
 endforeach
 
-if get_option('nfcoova')
-  conf.set10('HAVE_NETFILTER_COOVA', true)
-endif
-
 openssl_opt = get_option('openssl')
 if openssl_opt
   ssl_dep = dependency('openssl', required: true)
@@ -267,10 +263,6 @@ lib_sources = files(
 
 if openssl_opt
   lib_sources += files('ssl.c', 'ms_chap.c')
-endif
-
-if get_option('nfcoova')
-  lib_sources += files('kcoova.c')
 endif
 
 inc = include_directories('.')

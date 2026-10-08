@@ -78,9 +78,6 @@ static const char *compile_options = "Compiled with "
 #ifdef ENABLE_UAMUIPORT
     "ENABLE_UAMUIPORT "
 #endif
-#ifdef HAVE_NETFILTER_COOVA
-    "HAVE_NETFILTER_COOVA "
-#endif
 #ifdef HAVE_OPENSSL
     "HAVE_OPENSSL "
 #endif
@@ -804,10 +801,6 @@ int main(int argc, char **argv) {
 
 #ifdef USING_IPC_UNIX
   _options.unixipc = STRDUP(args_info.unixipc_arg);
-#endif
-
-#ifdef HAVE_NETFILTER_COOVA
-  _options.kname = STRDUP(args_info.kname_arg);
 #endif
 
   _options.wwwdir = STRDUP(args_info.wwwdir_arg);

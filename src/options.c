@@ -319,9 +319,6 @@ int options_fromfd(int fd, bstring bt) {
 #ifdef ENABLE_WPAD
   if (!option_s_l(bt, &o.wpadpacfile)) return 0;
 #endif
-#ifdef HAVE_NETFILTER_COOVA
-  if (!option_s_l(bt, &o.kname)) return 0;
-#endif
 #ifdef ENABLE_IPWHITELIST
   if (!option_s_l(bt, &o.ipwhitelist)) return 0;
 #endif
@@ -460,9 +457,6 @@ int options_save(char *file, bstring bt) {
 #endif
 #ifdef ENABLE_WPAD
   if (!option_s_s(bt, &o.wpadpacfile)) return 0;
-#endif
-#ifdef HAVE_NETFILTER_COOVA
-  if (!option_s_s(bt, &o.kname)) return 0;
 #endif
 #ifdef ENABLE_IPWHITELIST
   if (!option_s_s(bt, &o.ipwhitelist)) return 0;

@@ -1,4 +1,6 @@
 == ChangeLog (CoovaChilli-v1.8) ==
+* ipt_filter: drop the 1-hour entry timeout on the authed ipset; a client is never dropped while its session is in "pass" state (entries are removed explicitly only).
+* Remove the xt_coova kernel module (`src/linux/`, `kcoova.c`) and the `nfcoova` build option / `kname` runtime option; kernel filtering is iptables-legacy + ipset only (`ipt_filter.c`).
 * `meson install` now creates the run-state directory (`runstatedir`, DEFSTATEDIR) via `install_emptydir`; requires Meson >= 0.60.
 * ipt_filter: per-instance ipset/chain names suffixed with sanitized `radiusnasid` (`chilli_authed_<s>`, `CHILLI_FWD_<s>`, `CHILLI_NAT_<s>`) so several instances can share a host; legacy fixed names cleaned up when unused; wire the `--dhcpsocket` option. Also: `iptables-legacy -w 5` (xtables lock), fix missing `-t nat` on the two DNAT rules, and call `ipt_filter_cleanup()` at shutdown.
 * Remove leftover Automake `Makefile.in` under `src/`; drop stale `doc/chilli.conf`; keep generated `cmdline.c`/`cmdline.h` only in Meson build directory (not in VCS).

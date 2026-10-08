@@ -209,8 +209,6 @@ option "uamallowpost" - "Enable to allow a HTTP POST to the standard uamport int
 option "redirssl"  - "Enable redirection of SSL/HTTP port (requires SSL support)" flag off
 option "uamuissl"  - "Enable SSL/HTTPS support on the uamuiport" flag off
 
-option "kname" - "Enable the use of the coova kernel module instance of this namem" string no
-
 option "dhcpnotidle" - "DHCP counted for preventing idle-timeout" flag off
 
 option "captiveportalapi_uri" - "DHCP Captive Portal API URI (RFC 8910). Use HTTPS and valid certificate. Default Coova API: https://<my_domain><:my_uamuiport>/captive-portal-identification." string no

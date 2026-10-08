@@ -91,8 +91,8 @@ host must use a distinct path.
 
 ### Packet Filtering (iptables-legacy + ipset)
 
-`chilli` manages an ipset `chilli_authed_<s>` (type `hash:ip`, timeout
-1 hour) and two dedicated iptables-legacy chains `CHILLI_FWD_<s>` (filter)
+`chilli` manages an ipset `chilli_authed_<s>` (type `hash:ip`, no entry
+timeout) and two dedicated iptables-legacy chains `CHILLI_FWD_<s>` (filter)
 and `CHILLI_NAT_<s>` (nat), where `<s>` is the instance suffix derived from
 `radiusnasid` (default `nas01`): every character outside `[A-Za-z0-9_]` is
 replaced by `_` and the suffix is truncated to 17 characters (a warning is
@@ -119,8 +119,10 @@ At startup, the jumps from `<dhcpif>` to the former fixed-name objects
 objects are deleted only if no other (older) instance still references them.
 
 When a session is authenticated, the client IP is added to `chilli_authed_<s>`;
-on deauthentication or disconnect it is removed.  The set has a 1-hour
-per-entry timeout as a safety net against missed removes.
+on deauthentication or disconnect it is removed.  Entries have no timeout:
+a client must never be dropped while its chilli session is in the "pass"
+state, so an entry only disappears through an explicit remove, the cleanup
+at shutdown, or the set re-creation at the next start.
 
 Unauthenticated traffic is handled by the existing iptables policy (typically
 a DROP or REDIRECT-to-captive-portal rule set up separately).

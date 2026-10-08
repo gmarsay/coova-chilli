@@ -221,12 +221,14 @@ int ipt_filter_init(const char *iface, struct in_addr uamlisten,
            IPTABLES " -D FORWARD -o %s -j DROP 2>/dev/null", _iface);
   run_cmd(cmd);
 
-  /* 3. Détruire et recréer l'ipset */
+  /* 3. Détruire et recréer l'ipset.
+   * Pas de timeout : une entrée vit tant que la session chilli est en
+   * état "pass", elle n'est retirée que par ipt_filter_del_authed(),
+   * ipt_filter_cleanup() ou la recréation du set à l'init. */
   snprintf(cmd, sizeof(cmd), "ipset destroy %s 2>/dev/null", _set);
   run_cmd(cmd);
   snprintf(cmd, sizeof(cmd),
-           "ipset create %s hash:ip hashsize 1024 maxelem 65536 timeout 3600",
-           _set);
+           "ipset create %s hash:ip hashsize 1024 maxelem 65536", _set);
   if (run_cmd_log(cmd) != 0) {
     /* Le set existe encore (référence externe) — flush et réutilise */
     syslog(LOG_WARNING,

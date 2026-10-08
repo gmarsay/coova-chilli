@@ -758,7 +758,7 @@ static int tun_decaps_cb(void *ctx, struct pkt_buffer *pb) {
 
   }
 
-#if defined(HAVE_NETFILTER_QUEUE) || defined(HAVE_NETFILTER_COOVA)
+#ifdef HAVE_NETFILTER_QUEUE
   if (_options.uamlisten.s_addr != _options.dhcplisten.s_addr) {
     iph->daddr  = iph->daddr & ~(_options.mask.s_addr);
     iph->daddr |= _options.dhcplisten.s_addr & _options.mask.s_addr;
@@ -936,7 +936,7 @@ int tun_encaps(struct tun_t *tun, uint8_t *pack, size_t len, int idx) {
   }
 #endif
 
-#if defined(HAVE_NETFILTER_QUEUE) || defined(HAVE_NETFILTER_COOVA)
+#ifdef HAVE_NETFILTER_QUEUE
   if (_options.uamlisten.s_addr != _options.dhcplisten.s_addr) {
     struct pkt_iphdr_t *iph = pkt_iphdr(pack);
 
@@ -1046,12 +1046,6 @@ int tun_runscript(struct tun_t *tun, char* script, int wait) {
 #ifdef ENABLE_UAMUIPORT
   snprintf(b, sizeof(b), "%d", (int)_options.uamuiport);
   set_env("UAMUIPORT", VAL_STRING, b, 0);
-#endif
-
-#ifdef HAVE_NETFILTER_COOVA
-  if (_options.kname) {
-    set_env("KNAME", VAL_STRING, _options.kname, 0);
-  }
 #endif
 
   if (execl(

@@ -205,11 +205,7 @@ int net_open(net_interface *netif) {
   net_close(netif);
   net_gflags(netif);
 
-  if (
-#ifdef HAVE_NETFILTER_COOVA
-          (_options.uamlisten.s_addr == _options.dhcplisten.s_addr) && 
-#endif
-          ( !(netif->devflags & IFF_UP) || !(netif->devflags & IFF_RUNNING) )) {
+  if (!(netif->devflags & IFF_UP) || !(netif->devflags & IFF_RUNNING)) {
     struct in_addr noaddr;
     net_sflags(netif, netif->devflags | IFF_NOARP);
     memset(&noaddr, 0, sizeof(noaddr));

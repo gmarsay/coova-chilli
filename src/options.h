@@ -336,10 +336,6 @@ struct options_t {
   char *wpadpacfile;
 #endif
 
-#ifdef HAVE_NETFILTER_COOVA
-  char *kname;
-#endif
-
   char * _data; /* actual data buffer for loaded options */
 };
 

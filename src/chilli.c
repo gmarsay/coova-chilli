@@ -1034,11 +1034,6 @@ static int dnprot_terminate(struct app_conn_t *appconn) {
   appconn->s_state.bucketupsize = 0;
   appconn->s_state.bucketdownsize = 0;
 #endif
-#ifdef HAVE_NETFILTER_COOVA
-  if (_options.kname) {
-    kmod_coova_update(appconn);
-  }
-#endif
     switch (appconn->dnprot) {
       case DNPROT_WPA:
 #ifdef ENABLE_EAPOL
@@ -1154,12 +1149,6 @@ static int checkconn(void) {
   struct app_conn_t *conn;
   uint32_t checkdiff;
   uint32_t rereaddiff;
-
-#ifdef HAVE_NETFILTER_COOVA
-  if (_options.kname) {
-    kmod_coova_sync();
-  }
-#endif
 
   checkdiff = mainclock_diffu(checktime);
 
@@ -1977,12 +1966,6 @@ int dnprot_accept(struct app_conn_t *appconn) {
         RADIUS_VALUE_COOVACHILLI_SESSION_AUTH;
 #endif
 
-#ifdef HAVE_NETFILTER_COOVA
-    if (_options.kname) {
-      kmod_coova_update(appconn);
-    }
-#endif
-
     /* if (!(appconn->s_params.flags & IS_UAM_REAUTH))*/
     acct_req(ACCT_USER, appconn, RADIUS_STATUS_TYPE_START);
 
@@ -2361,7 +2344,7 @@ int cb_redir_getstate(struct redir_t *redir,
   struct app_conn_t *appconn;
   uint8_t flags = 0;
 
-#if defined(HAVE_NETFILTER_QUEUE) || defined(HAVE_NETFILTER_COOVA)
+#ifdef HAVE_NETFILTER_QUEUE
   if (_options.uamlisten.s_addr != _options.dhcplisten.s_addr) {
     addr->s_addr  = addr->s_addr & ~(_options.mask.s_addr);
     addr->s_addr |= _options.dhcplisten.s_addr & _options.mask.s_addr;
@@ -4521,7 +4504,7 @@ static int uam_msg(struct redir_msg_t *msg) {
 
   struct app_conn_t *appconn = NULL;
 
-#if defined(HAVE_NETFILTER_QUEUE) || defined(HAVE_NETFILTER_COOVA)
+#ifdef HAVE_NETFILTER_QUEUE
   if (_options.uamlisten.s_addr != _options.dhcplisten.s_addr) {
     msg->mdata.address.sin_addr.s_addr  = msg->mdata.address.sin_addr.s_addr & ~(_options.mask.s_addr);
     msg->mdata.address.sin_addr.s_addr |= _options.dhcplisten.s_addr & _options.mask.s_addr;
@@ -4687,12 +4670,6 @@ static struct app_conn_t * find_app_conn(struct cmdsock_request *req,
 }
 
 int chilli_cmd(struct cmdsock_request *req, bstring s, int sock) {
-
-#ifdef HAVE_NETFILTER_COOVA
-  if (_options.kname) {
-    kmod_coova_sync();
-  }
-#endif
 
   switch(req->type) {
 
@@ -5460,11 +5437,6 @@ int chilli_main(int argc, char **argv) {
     {
 #ifdef ENABLE_ACCOUNTING_ONOFF
       acct_req(ACCT_USER, &admin_session, RADIUS_STATUS_TYPE_ACCOUNTING_ON);
-#endif
-#ifdef HAVE_NETFILTER_COOVA
-      if (_options.kname) {
-        kmod_coova_clear();
-      }
 #endif
     }
 
